@@ -62,6 +62,36 @@ uv run pytest                        # run full test suite
 
 ---
 
+## Claude Code Hook Setup
+
+Automatically triggers a security review on every feature-building prompt — no manual `/sec-review` needed.
+
+**Global install** (fires in every project — recommended for personal machines):
+
+```bash
+python3 scripts/setup_claude_hook.py           # default, same as --global
+python3 scripts/setup_claude_hook.py --global  # explicit
+```
+
+**Project-scoped install** (fires only when working inside this repo):
+
+```bash
+python3 scripts/setup_claude_hook.py --project
+```
+
+Then restart Claude Code.
+
+The hook detects intent, checks if the MCP server is running, and routes to the appropriate security review:
+- **MCP running** → instructs Claude to call `lightweight_security_review` (full integration)
+- **MCP not running** → runs `SecurityAssessment` standalone (150+ OWASP guidelines)
+- **Neither available** → injects inline OWASP reminders + setup guidance
+
+**How global install works:** the setup script creates a stable symlink at `~/.claude/hooks/security_hook.py` and registers that path in `~/.claude/settings.json`. If you move the repo, re-run the setup script — only the symlink updates, `settings.json` stays unchanged.
+
+**Project-scoped note:** `.claude/settings.json` is gitignored, so each developer must run the setup script once after cloning.
+
+---
+
 ## Core MCP patterns
 
 **Tool naming**: `{provider}_{service}_{action}` (e.g., `atlassian_jira_create_issue`)

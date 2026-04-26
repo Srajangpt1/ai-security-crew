@@ -7,8 +7,37 @@ A lightweight MCP server for security reviews built for vibe coding — injects 
 
 **Jump to installation:**
 - [MCP Server](#quick-start) — full feature set with Jira, Confluence, CVE scanning (with reachability), and threat modeling
+- [Claude Code Hook](#claude-code-hook) — automatic security review on every feature-building prompt, no manual commands needed
 - [Claude Code Plugin](#claude-code-plugin) — install 3 security skills globally in Claude Code (no Jira/MCP needed)
 - [Claude Code Skills only](#claude-code-skills) — manually add slash commands to a specific project
+
+---
+
+## Claude Code Hook
+
+Automatically injects a security review into every feature-building prompt — no manual command needed. Once installed, the hook fires whenever Claude Code detects intent to build something (e.g. "implement", "add", "create"), checks whether the MCP server is available, and routes accordingly:
+
+| State | Behaviour |
+|-------|-----------|
+| MCP server running | Instructs Claude to call `lightweight_security_review` before writing code |
+| MCP not running | Runs `SecurityAssessment` standalone (150+ OWASP guidelines) |
+| Neither available | Injects inline OWASP reminders and setup guidance |
+
+**Install globally** (fires across all your projects — recommended):
+
+```bash
+git clone https://github.com/Srajangpt1/ai_security_crew
+cd ai_security_crew
+python3 scripts/setup_claude_hook.py
+```
+
+**Install for this repo only:**
+
+```bash
+python3 scripts/setup_claude_hook.py --project
+```
+
+Then restart Claude Code. If you move the repo later, re-run the setup script to update the symlink.
 
 ---
 
