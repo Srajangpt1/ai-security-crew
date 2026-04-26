@@ -4,11 +4,10 @@ Tests cover detection logic (trigger / skip / false positive) using the
 bash hook script directly via subprocess, and the Python runner via its
 public interface.
 """
+
 import json
 import subprocess
 from pathlib import Path
-
-import pytest
 
 SCRIPTS_DIR = Path(__file__).parent.parent.parent / "scripts"
 HOOK_SCRIPT = SCRIPTS_DIR / "security_hook.sh"
@@ -54,7 +53,9 @@ class TestDetectionSkips:
         assert code == 0
 
     def test_docs_prompt_skipped(self) -> None:
-        output, code = run_hook("write documentation for the authentication module please")
+        output, code = run_hook(
+            "write documentation for the authentication module please"
+        )
         assert output == ""
         assert code == 0
 
@@ -65,7 +66,9 @@ class TestDetectionSkips:
 
     def test_security_review_prompt_skipped(self) -> None:
         # "review" keyword catches this before the action-verb check
-        output, code = run_hook("implement a security review process for the login flow")
+        output, code = run_hook(
+            "implement a security review process for the login flow"
+        )
         assert output == ""
         assert code == 0
 
@@ -95,7 +98,9 @@ class TestDetectionTriggers:
         assert "SECURITY" in output
 
     def test_build_auth_system_triggers(self) -> None:
-        output, code = run_hook("build an authentication system using OAuth2 for the app")
+        output, code = run_hook(
+            "build an authentication system using OAuth2 for the app"
+        )
         assert output != ""
         assert "SECURITY" in output
 
@@ -113,12 +118,16 @@ class TestDetectionTriggers:
         assert "SECURITY" in output
 
     def test_integrate_webhook_triggers(self) -> None:
-        output, code = run_hook("integrate a webhook handler for incoming payment events")
+        output, code = run_hook(
+            "integrate a webhook handler for incoming payment events"
+        )
         assert output != ""
         assert "SECURITY" in output
 
     def test_write_database_migration_triggers(self) -> None:
-        output, code = run_hook("write a database migration to add the user tokens table")
+        output, code = run_hook(
+            "write a database migration to add the user tokens table"
+        )
         assert output != ""
         assert "SECURITY" in output
 
