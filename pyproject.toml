@@ -1,7 +1,7 @@
 [project]
 name = "mcp-security-review"
 dynamic = ["version"]
-description = "A chill Model Context Protocol (MCP) server for security reviews while vibe coding. Seamlessly assess security risks, check compliance, and document findings in Jira and Confluence without breaking your coding flow. Features OWASP guidelines, risk analysis, and AI-assisted security workflows."
+description = "Security for vibe coders and their coding agents: an MCP server that reviews plans and generated code, verifies dependencies, and models threats while you build."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -28,8 +28,7 @@ dependencies = [
     "types-cachetools>=5.5.0.20240820",
 ]
 [[project.authors]]
-name = "sooperset"
-email = "soomiles.dev@gmail.com"
+name = "Srajan Gupta"
 
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
