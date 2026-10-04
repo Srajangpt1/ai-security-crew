@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — ownership and attribution
+- Package metadata now lists Srajan Gupta as author with a security-focused description
+- `LICENSE` keeps the upstream MIT notice and adds a copyright line for this project
+- Added `NOTICE` listing code derived from sooperset/mcp-atlassian; added a Credits section to the README
+
 ### Added — SCA vulnerability scanning
 - `verify_packages` tool: validates package names and versions against PyPI/npm registries; suggests closest match for hallucinated or misspelled packages
 - `scan_dependencies` tool: queries [OSV.dev](https://osv.dev) for CVEs and performs reachability analysis on provided code snippets
