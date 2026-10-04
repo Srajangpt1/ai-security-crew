@@ -212,7 +212,7 @@ class SecurityReviewMCP(FastMCP[MainAppContext]):
         return app
 
 
-token_validation_cache: TTLCache[
+token_validation_cache: TTLCache[  # type: ignore[type-arg]
     int, tuple[bool, str | None, JiraFetcher | None, ConfluenceFetcher | None]
 ] = TTLCache(maxsize=100, ttl=300)
 
