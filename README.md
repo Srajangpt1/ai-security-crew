@@ -174,10 +174,6 @@ Pre-commit hooks enforce code quality (Ruff, Prettier, Pyright). Run `uv run pyt
 
 Never commit API tokens. See [SECURITY.md](SECURITY.md) for best practices.
 
-## Credits
-
-The Jira and Confluence integration is derived from [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian) (MIT, Copyright (c) 2024 Hyeonsoo Lee). See [NOTICE](NOTICE) for the exact paths. All security tooling is original work.
-
 ## License
 
 Licensed under MIT — see [LICENSE](LICENSE).
