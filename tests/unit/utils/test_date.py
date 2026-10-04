@@ -2,7 +2,7 @@
 
 import pytest
 
-from mcp_security_review.utils import parse_date
+from mcp_security_review.utils.date import parse_date
 
 
 def test_parse_date_invalid_input():

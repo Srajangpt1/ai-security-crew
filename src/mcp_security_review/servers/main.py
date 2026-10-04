@@ -1,9 +1,11 @@
 """Main FastMCP server setup for security review workflows."""
 
+from __future__ import annotations
+
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, Literal, Optional
+from typing import TYPE_CHECKING, Any, Literal
 
 from cachetools import TTLCache
 from fastmcp import FastMCP
@@ -15,21 +17,23 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mcp_security_review.providers.atlassian.confluence import ConfluenceFetcher
-from mcp_security_review.providers.atlassian.confluence.config import ConfluenceConfig
-from mcp_security_review.providers.atlassian.jira import JiraFetcher
-from mcp_security_review.providers.atlassian.jira.config import JiraConfig
 from mcp_security_review.utils.environment import get_available_services
 from mcp_security_review.utils.io import is_read_only_mode
 from mcp_security_review.utils.logging import mask_sensitive
 from mcp_security_review.utils.tools import get_enabled_tools, should_include_tool
 
-from .confluence import confluence_mcp
 from .context import MainAppContext
 from .general import general_mcp
-from .jira import jira_mcp
 from .sca import sca_mcp
 from .threat_model import threat_model_mcp
+
+if TYPE_CHECKING:
+    from mcp_security_review.providers.atlassian.confluence import ConfluenceFetcher
+    from mcp_security_review.providers.atlassian.confluence.config import (
+        ConfluenceConfig,
+    )
+    from mcp_security_review.providers.atlassian.jira import JiraFetcher
+    from mcp_security_review.providers.atlassian.jira.config import JiraConfig
 
 logger = logging.getLogger("mcp-security-review.server.main")
 
@@ -50,6 +54,8 @@ async def main_lifespan(app: FastMCP[MainAppContext]) -> AsyncIterator[dict]:
 
     if services.get("jira"):
         try:
+            from mcp_security_review.providers.atlassian.jira.config import JiraConfig
+
             jira_config = JiraConfig.from_env()
             if jira_config.is_auth_configured():
                 loaded_jira_config = jira_config
@@ -61,11 +67,20 @@ async def main_lifespan(app: FastMCP[MainAppContext]) -> AsyncIterator[dict]:
                     "Jira URL found, but authentication is not fully configured. "
                     "Jira tools will be unavailable."
                 )
+        except ImportError:
+            logger.warning(
+                "Jira is configured but the Atlassian extra is not installed. "
+                "Install it with: pip install 'mcp-security-review[atlassian]'"
+            )
         except Exception as e:
             logger.error(f"Failed to load Jira configuration: {e}", exc_info=True)
 
     if services.get("confluence"):
         try:
+            from mcp_security_review.providers.atlassian.confluence.config import (
+                ConfluenceConfig,
+            )
+
             confluence_config = ConfluenceConfig.from_env()
             if confluence_config.is_auth_configured():
                 loaded_confluence_config = confluence_config
@@ -77,6 +92,11 @@ async def main_lifespan(app: FastMCP[MainAppContext]) -> AsyncIterator[dict]:
                     "Confluence URL found, but authentication is not fully configured. "
                     "Confluence tools will be unavailable."
                 )
+        except ImportError:
+            logger.warning(
+                "Confluence is configured but the Atlassian extra is not installed. "
+                "Install it with: pip install 'mcp-security-review[atlassian]'"
+            )
         except Exception as e:
             logger.error(f"Failed to load Confluence configuration: {e}", exc_info=True)
 
@@ -201,7 +221,7 @@ class SecurityReviewMCP(FastMCP[MainAppContext]):
         path: str | None = None,
         middleware: list[Middleware] | None = None,
         transport: Literal["streamable-http", "sse"] = "streamable-http",
-    ) -> "Starlette":
+    ) -> Starlette:
         user_token_mw = Middleware(UserTokenMiddleware, mcp_server_ref=self)
         final_middleware_list = [user_token_mw]
         if middleware:
@@ -221,7 +241,7 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
     """Middleware to extract Atlassian user tokens from Authorization headers."""
 
     def __init__(
-        self, app: Any, mcp_server_ref: Optional["SecurityReviewMCP"] = None
+        self, app: Any, mcp_server_ref: SecurityReviewMCP | None = None
     ) -> None:
         super().__init__(app)
         self.mcp_server_ref = mcp_server_ref
@@ -390,10 +410,20 @@ main_mcp = SecurityReviewMCP(
     instructions=_AGENT_INSTRUCTIONS,
 )
 main_mcp.mount("general", general_mcp)
-main_mcp.mount("jira", jira_mcp)
-main_mcp.mount("confluence", confluence_mcp)
 main_mcp.mount("threatmodel", threat_model_mcp)
 main_mcp.mount("sca", sca_mcp)
+
+try:
+    from .confluence import confluence_mcp
+    from .jira import jira_mcp
+except ImportError:
+    logger.info(
+        "Atlassian extra not installed; Jira and Confluence tools are disabled. "
+        "Install with: pip install 'mcp-security-review[atlassian]'"
+    )
+else:
+    main_mcp.mount("jira", jira_mcp)
+    main_mcp.mount("confluence", confluence_mcp)
 
 
 @main_mcp.custom_route("/healthz", methods=["GET"], include_in_schema=False)

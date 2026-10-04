@@ -9,7 +9,7 @@ from requests.exceptions import HTTPError
 from mcp_security_review.exceptions import MCPAtlassianAuthenticationError
 from mcp_security_review.models.atlassian.jira import JiraIssue
 from mcp_security_review.models.atlassian.jira.common import JiraChangelog
-from mcp_security_review.utils import parse_date
+from mcp_security_review.utils.date import parse_date
 
 from .client import JiraClient
 from .constants import DEFAULT_READ_JIRA_FIELDS

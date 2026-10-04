@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — Jira and Confluence are now an optional extra
+- Core install (`pip install mcp-security-review`) no longer pulls Atlassian packages; it exposes the general, threat model and SCA tools only
+- Install `mcp-security-review[atlassian]` to enable Jira and Confluence tools (`assess_ticket_security`, `get_issue`, `search`, `get_page`)
+- `utils/__init__.py` re-exports only dependency-light helpers; import `parse_date`, OAuth and SSL helpers from their modules
+- Docker image installs the `atlassian` extra to keep its current behaviour
+
 ### Changed — ownership and attribution
 - Package metadata now lists Srajan Gupta as author with a security-focused description
 - `LICENSE` keeps the upstream MIT notice and adds a copyright line for this project

@@ -7,7 +7,7 @@ from typing import Any
 import requests
 
 from mcp_security_review.models.atlassian.jira import JiraSprint
-from mcp_security_review.utils import parse_date
+from mcp_security_review.utils.date import parse_date
 
 from .client import JiraClient
 
