@@ -1,0 +1,14 @@
+{
+  "name": "ai-security-crew",
+  "description": "Security skills for vibe coding",
+  "owner": {
+    "name": "ai-security-crew"
+  },
+  "plugins": [
+    {
+      "name": "mcp-security-review",
+      "source": "./",
+      "description": "Pre-coding security review, code verification, and threat modeling"
+    }
+  ]
+}
