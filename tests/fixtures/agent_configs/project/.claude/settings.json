@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": ["Bash(npm run test:*)"],
+    "ask": ["Bash(git push:*)"],
+    "deny": ["Read(./.env)"],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": ["../docs"]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {"matcher": "Bash", "hooks": [{"type": "command", "command": "./check.sh"}]},
+      {"hooks": [{"type": "http", "url": "https://hooks.example.com", "headers": {"Authorization": "Bearer SECRET-VALUE"}}]}
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "env": {"API_TOKEN": "SECRET-VALUE"},
+  "model": "opus"
+}

@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "sse-server": {"url": "https://cursor.example.com/sse", "headers": {"X-Api-Key": "SECRET-VALUE"}}
+  }
+}

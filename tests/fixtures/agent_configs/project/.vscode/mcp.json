@@ -1,0 +1,11 @@
+{
+  // VS Code allows comments
+  "inputs": [],
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {"Authorization": "Bearer SECRET-VALUE"},
+    },
+  },
+}
