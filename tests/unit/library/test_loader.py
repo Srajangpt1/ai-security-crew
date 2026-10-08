@@ -112,7 +112,10 @@ def test_disable_removes_entries_and_prunes_references(tmp_path: Path) -> None:
     assert "webhook-replay" not in library.threats
     # Still present because it has other countermeasures left.
     assert "upload-executable-file" in library.threats
-    assert "upload-allow-list" not in library.threats["upload-executable-file"].countermeasures
+    assert (
+        "upload-allow-list"
+        not in library.threats["upload-executable-file"].countermeasures
+    )
 
 
 def test_disabling_every_countermeasure_of_a_threat_drops_it(tmp_path: Path) -> None:

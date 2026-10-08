@@ -99,11 +99,14 @@ class Library:
         picked = set(component_ids)
         selected = set(expanded)
 
-        threats = [t for t in self.threats.values() if picked.intersection(t.components)]
+        threats = [
+            t for t in self.threats.values() if picked.intersection(t.components)
+        ]
         also_consider = [
             t
             for t in self.threats.values()
-            if selected.intersection(t.components) and not picked.intersection(t.components)
+            if selected.intersection(t.components)
+            and not picked.intersection(t.components)
         ]
         threats.sort(key=lambda t: (SEVERITY_RANK[t.severity], t.id))
         also_consider.sort(key=lambda t: (SEVERITY_RANK[t.severity], t.id))

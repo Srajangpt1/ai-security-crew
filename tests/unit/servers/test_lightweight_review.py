@@ -97,7 +97,9 @@ async def test_picking_many_components_adds_a_narrowing_hint() -> None:
 async def test_sensitive_data_raises_the_risk_level() -> None:
     plain = await call(task_description="Upload", components="file-upload")
     sensitive = await call(
-        task_description="Upload", components="file-upload", data_handled="personal_data"
+        task_description="Upload",
+        components="file-upload",
+        data_handled="personal_data",
     )
 
     assert plain["assessment"]["risk_level"] == "high"
@@ -124,7 +126,7 @@ async def test_login_review_is_much_smaller_than_the_old_output() -> None:
 
     assert data["assessment"]["risk_level"] == "critical"
     # The previous guideline-based review of this task was about 52,000 characters.
-    assert len(json.dumps(data, separators=(',', ':'))) < 16000
+    assert len(json.dumps(data, separators=(",", ":"))) < 16000
 
 
 @pytest.mark.anyio

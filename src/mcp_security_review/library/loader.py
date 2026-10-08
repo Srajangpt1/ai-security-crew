@@ -65,7 +65,11 @@ def load_library(project_root: Path | None = None) -> Library:
     components = dict(builtin.components)
     threats = dict(builtin.threats)
     countermeasures = dict(builtin.countermeasures)
-    added: dict[str, set[str]] = {"components": set(), "threats": set(), "countermeasures": set()}
+    added: dict[str, set[str]] = {
+        "components": set(),
+        "threats": set(),
+        "countermeasures": set(),
+    }
     disabled: set[str] = set()
 
     for path in files:
@@ -105,7 +109,9 @@ def check_references(library: Library) -> None:
     for c in library.components.values():
         for implied in c.implies:
             if implied not in library.components:
-                errors.append(f"component '{c.id}' implies unknown component '{implied}'")
+                errors.append(
+                    f"component '{c.id}' implies unknown component '{implied}'"
+                )
     for t in library.threats.values():
         if not t.components:
             errors.append(f"threat '{t.id}' lists no components")
@@ -128,7 +134,12 @@ def _builtin_library() -> Library:
     loaded: dict[str, dict[str, Any]] = {}
     for kind, model in _KINDS.items():
         text = base.joinpath(f"{kind}.yaml").read_text(encoding="utf-8")
-        entries = _parse_entries(kind, _safe_load(text, f"{kind}.yaml", errors).get(kind), Path(f"{kind}.yaml"), errors)
+        entries = _parse_entries(
+            kind,
+            _safe_load(text, f"{kind}.yaml", errors).get(kind),
+            Path(f"{kind}.yaml"),
+            errors,
+        )
         ids: dict[str, Any] = {}
         for entry in entries:
             if entry.id in ids:
@@ -138,7 +149,9 @@ def _builtin_library() -> Library:
         del model
     if errors:
         raise LibraryError(errors)
-    library = Library(loaded["components"], loaded["threats"], loaded["countermeasures"])
+    library = Library(
+        loaded["components"], loaded["threats"], loaded["countermeasures"]
+    )
     check_references(library)
     return library
 
@@ -190,10 +203,16 @@ def _parse_entries(kind: str, raw: Any, path: Path, errors: list[str]) -> list[A
         try:
             parsed.append(model.model_validate(item))
         except ValidationError as exc:
-            label = item.get("id", f"#{index + 1}") if isinstance(item, dict) else f"#{index + 1}"
+            label = (
+                item.get("id", f"#{index + 1}")
+                if isinstance(item, dict)
+                else f"#{index + 1}"
+            )
             for problem in exc.errors():
                 where = ".".join(str(p) for p in problem["loc"])
-                errors.append(f"{path.name}: {kind[:-1]} '{label}': {where}: {problem['msg']}")
+                errors.append(
+                    f"{path.name}: {kind[:-1]} '{label}': {where}: {problem['msg']}"
+                )
     return parsed
 
 
@@ -221,8 +240,14 @@ def _apply_disable(
         remaining_cms = [m for m in threat.countermeasures if m in countermeasures]
         if remaining_components and remaining_cms:
             kept[key] = threat.model_copy(
-                update={"components": remaining_components, "countermeasures": remaining_cms}
+                update={
+                    "components": remaining_components,
+                    "countermeasures": remaining_cms,
+                }
             )
         else:
-            logger.info("Dropping threat '%s' because its components or countermeasures were disabled", key)
+            logger.info(
+                "Dropping threat '%s' because its components or countermeasures were disabled",
+                key,
+            )
     return components, kept, countermeasures
