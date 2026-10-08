@@ -174,15 +174,7 @@ def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, An
             c for c in resolution.components if c not in resolution.picked
         ],
         "sensitive_data": resolution.sensitive_data,
-        "threats": [
-            {
-                "id": t.id,
-                "name": t.name,
-                "severity": t.severity.value,
-                "cwe": t.cwe,
-            }
-            for t in resolution.threats
-        ],
+        "threats": [_threat_view(t) for t in resolution.threats],
         "countermeasures": [
             {
                 "id": m.id,
@@ -199,3 +191,16 @@ def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, An
             for t in resolution.also_consider[:max_also_consider]
         ],
     }
+
+
+def _threat_view(threat: Threat) -> dict[str, Any]:
+    """Compact view of one threat; the MCP Top 10 ids appear only when present."""
+    view: dict[str, Any] = {
+        "id": threat.id,
+        "name": threat.name,
+        "severity": threat.severity.value,
+        "cwe": threat.cwe,
+    }
+    if threat.mcp_top10:
+        view["mcp_top10"] = threat.mcp_top10
+    return view

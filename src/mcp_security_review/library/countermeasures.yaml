@@ -304,6 +304,30 @@ countermeasures:
     asvs: [v5.0.0-13.3.1, v5.0.0-13.3.2]
     baseline: true
 
+  - id: approved-crypto
+    name: Use approved algorithms and modes
+    how_to: Use AES-GCM or ChaCha20-Poly1305 for encryption and SHA-256 or stronger for hashing. Avoid MD5, SHA-1, DES, RC4, and ECB mode.
+    effort: low
+    asvs: [v5.0.0-11.3.1, v5.0.0-11.3.2, v5.0.0-11.4.1]
+
+  - id: separate-keys-per-environment
+    name: Use separate keys per environment and rotate them
+    how_to: Generate different keys for development, staging, and production, load them from the secrets manager, and rotate them on a schedule or after exposure.
+    effort: medium
+    asvs: []
+
+  - id: https-everywhere
+    name: Use HTTPS for every connection
+    how_to: Serve everything over HTTPS with a trusted certificate, redirect HTTP to HTTPS, and use TLS for service-to-service calls as well.
+    effort: low
+    asvs: [v5.0.0-12.2.1, v5.0.0-12.2.2]
+
+  - id: modern-tls-config
+    name: Enable only current TLS versions and cipher suites
+    how_to: Allow TLS 1.2 and 1.3 only, use the recommended cipher suites from your platform or proxy, and turn off SSL and older TLS.
+    effort: low
+    asvs: [v5.0.0-12.1.1, v5.0.0-12.1.2]
+
   - id: disable-debug-in-prod
     name: Turn debug features off in production
     how_to: Set DEBUG false, remove debug consoles and verbose logging, and fail the deploy if debug is on.

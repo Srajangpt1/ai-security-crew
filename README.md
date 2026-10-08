@@ -123,7 +123,7 @@ docker run --rm -p 8000:8000 mcp-security-review:latest --transport sse
 
 ## Threat Library
 
-`lightweight_security_review` is backed by a built-in library of **23 components**, **83 threats**, and **81 countermeasures** (web and API apps, plus LLM, agent, and MCP features). Threats carry STRIDE and CWE references, and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids.
+`lightweight_security_review` is backed by a built-in library of **25 components**, **88 threats**, and **85 countermeasures** (web and API apps, plus LLM, agent, and MCP features). Threats carry STRIDE and CWE references (and OWASP MCP Top 10 ids for agent and MCP threats), and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids.
 
 The agent calls the tool twice: the first call returns a menu of components, the second takes the ids that apply and returns the threats and countermeasures.
 

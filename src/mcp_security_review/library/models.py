@@ -10,6 +10,7 @@ SLUG = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 Slug = Annotated[str, StringConstraints(pattern=SLUG)]
 CweId = Annotated[str, StringConstraints(pattern=r"^CWE-[1-9][0-9]*$")]
 AsvsId = Annotated[str, StringConstraints(pattern=r"^v5\.0\.0-[0-9]+\.[0-9]+\.[0-9]+$")]
+McpTop10Id = Annotated[str, StringConstraints(pattern=r"^MCP(0[1-9]|10):2025$")]
 
 
 class Severity(str, Enum):
@@ -73,6 +74,7 @@ class Threat(_Entry):
     severity: Severity
     stride: list[Stride] = Field(default_factory=list)
     cwe: list[CweId] = Field(default_factory=list)
+    mcp_top10: list[McpTop10Id] = Field(default_factory=list)
     countermeasures: list[Slug]
 
 

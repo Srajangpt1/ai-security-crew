@@ -53,6 +53,14 @@ components:
     name: Secrets and configuration
     applies_when: The feature uses API keys, passwords, tokens, environment variables, or config files.
 
+  - id: cryptography
+    name: Cryptography
+    applies_when: The feature encrypts, hashes, or signs data, or generates keys or random values.
+
+  - id: transport-security
+    name: HTTPS and TLS
+    applies_when: The app serves HTTPS, terminates TLS, or sends data between services over a network.
+
   - id: user-generated-content
     name: User-generated content
     applies_when: The app stores or shows text, HTML, markdown, or images that users wrote or supplied.

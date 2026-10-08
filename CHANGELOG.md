@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed — code review no longer sends the code through the tool
 - `verify_code_security` no longer needs the code. The checklist depends only on the components, so the `code` argument is now optional, deprecated, and ignored, and the response no longer repeats the code (it used to return it twice). The agent reviews the code already in its context against the returned checklist. This keeps large changes from being pasted into the tool call and echoed back
 
+### Added — cryptography, transport security, and MCP Top 10 ids
+- New components `cryptography` and `transport-security` with five threats (weak algorithms, hardcoded keys, weak random generators, cleartext transport, outdated TLS) and four countermeasures
+- Threats can carry `mcp_top10` ids (OWASP MCP Top 10 2025); the agent, LLM, and MCP threats are tagged, and the review and threat-model tools return them. A test checks every cited id against the official list
+
 ### Changed — code review and threat modeling use the threat library
 - `verify_code_security` takes `components`, `data_handled`, and `project_root` instead of `security_context`. Its focus areas and checklist come from the library's threats and countermeasures for the components you name, plus a short baseline. There is no language detection; the agent adapts each fix to its own stack
 - `perform_threat_model` takes `components`, `data_handled`, and `project_root`, and returns `known_threats` (library threats and countermeasures, or the component menu) in place of `security_signals`

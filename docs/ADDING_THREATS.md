@@ -37,6 +37,7 @@ threats:
     severity: high                      # critical | high | medium | low
     stride: [spoofing]                  # optional
     cwe: [CWE-345]                      # optional, format CWE-<number>
+    mcp_top10: ["MCP06:2025"]           # optional, OWASP MCP Top 10 2025 id
     countermeasures: [check-sso-audience, validate-token-claims]
 
 countermeasures:

@@ -26,9 +26,9 @@ def library() -> Library:
 
 
 def test_builtin_library_is_not_empty(library: Library) -> None:
-    assert len(library.components) >= 20
-    assert len(library.threats) >= 60
-    assert len(library.countermeasures) >= 60
+    assert len(library.components) >= 25
+    assert len(library.threats) >= 85
+    assert len(library.countermeasures) >= 85
 
 
 def test_every_component_has_threats(library: Library) -> None:
@@ -39,6 +39,42 @@ def test_every_component_has_threats(library: Library) -> None:
 def test_every_countermeasure_is_used(library: Library) -> None:
     used = {m for t in library.threats.values() for m in t.countermeasures}
     assert set(library.countermeasures) - used == set()
+
+
+MCP_TOP10 = dict(
+    line.split("\t", 1)
+    for line in (Path(__file__).parent / "mcp_top10_2025.txt")
+    .read_text(encoding="utf-8")
+    .splitlines()
+    if line.strip() and not line.startswith("#")
+)
+
+
+def test_cited_mcp_top10_ids_exist(library: Library) -> None:
+    cited = {i for t in library.threats.values() for i in t.mcp_top10}
+    assert len(MCP_TOP10) == 10
+    assert cited
+    assert cited - set(MCP_TOP10) == set()
+
+
+def test_agent_threats_are_mapped_to_the_mcp_top10(library: Library) -> None:
+    assert library.threats["prompt-injection"].mcp_top10 == ["MCP06:2025"]
+    assert library.threats["excessive-agent-permissions"].mcp_top10 == ["MCP02:2025"]
+    assert "MCP03:2025" in library.threats["untrusted-mcp-server"].mcp_top10
+    assert "MCP01:2025" in library.threats["agent-reads-secrets"].mcp_top10
+    # Ordinary web threats are not forced into the MCP list.
+    assert library.threats["sql-injection"].mcp_top10 == []
+
+
+def test_cryptography_and_transport_threats_exist(library: Library) -> None:
+    crypto = library.resolve(["cryptography"])
+    transport = library.resolve(["transport-security"])
+
+    assert {"weak-crypto-algorithms", "hardcoded-crypto-keys"} <= {
+        t.id for t in crypto.threats
+    }
+    assert "CWE-327" in {c for t in crypto.threats for c in t.cwe}
+    assert {"cleartext-transport", "outdated-tls"} <= {t.id for t in transport.threats}
 
 
 def test_cited_asvs_ids_exist(library: Library) -> None:
