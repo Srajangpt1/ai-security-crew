@@ -120,9 +120,9 @@ AGENT_INSTRUCTIONS = (
     "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
     "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
     "## 3. After generating code\n"
-    "Call `general_verify_code_security` with the generated code and the same `components`.\n"  # noqa: E501
+    "Call `general_verify_code_security` with the same `components`. Do not paste code: it returns a checklist, and you review the code you wrote against it.\n"  # noqa: E501
     "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
-    "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
+    "- Follow the `review_prompt` in the response, check each item against your code, and report findings.\n\n"  # noqa: E501
     "## 4. Persisting threat models (optional)\n"
     "After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
     "If earlier threat models or design pages exist in a wiki or docs tool you have connected, fetch them first and pass them as `previous_models_json` to avoid duplicating work.\n"  # noqa: E501

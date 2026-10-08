@@ -5,11 +5,8 @@ import pytest
 from mcp_security_review.library import UnknownComponentError
 from mcp_security_review.security import CodeReviewContextBuilder
 
-CODE = "def upload(f):\n    f.save('/var/www/' + f.filename)\n"
-
-
 def build(**kwargs):
-    return CodeReviewContextBuilder().build_review_context(code=CODE, **kwargs)
+    return CodeReviewContextBuilder().build_review_context(**kwargs)
 
 
 def test_no_components_gives_only_the_baseline_checklist() -> None:
@@ -61,10 +58,11 @@ def test_unknown_component_is_rejected() -> None:
         build(components=["teleporter"])
 
 
-def test_review_prompt_contains_the_code_and_checklist() -> None:
+def test_review_prompt_contains_the_checklist_but_no_code() -> None:
     context = build(file_path="views.py", components=["file-upload"])
 
-    assert CODE in context.review_prompt
+    assert "```" not in context.review_prompt
+    assert "already in your context" in context.review_prompt
     assert "### Security Checklist" in context.review_prompt
     assert "**Components:** file-upload" in context.review_prompt
     assert "Language" not in context.review_prompt

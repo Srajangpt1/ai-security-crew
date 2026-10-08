@@ -53,7 +53,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Post-coding
 | Tool | When to Use |
 |------|-------------|
-| `verify_code_security` | After generating code — get a checklist aimed at the components' threats, for your agent to review the code against |
+| `verify_code_security` | After generating code — get a checklist aimed at the components' threats; the tool never receives your code, your agent reviews it against the checklist |
 
 ### Threat model persistence
 | Tool | When to Use |
@@ -66,7 +66,7 @@ The server automatically sends workflow instructions to any connecting agent (Cl
 
 1. **Before coding** — call `lightweight_security_review`. If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), the agent first fetches it with the matching MCP server you have connected and passes the details in
 2. **When adding packages** — call `verify_packages`, then `scan_dependencies` with the code that uses them
-3. **After generating code** — call `verify_code_security` and follow the `review_prompt` to report findings
+3. **After generating code** — call `verify_code_security` with the same components and review your code against the checklist it returns
 4. **For significant features** — call `perform_threat_model` and persist with `update_threat_model_file`
 
 ## Dependency Scanning
