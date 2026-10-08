@@ -20,13 +20,13 @@ class ThreatReference:
     """A reference linking a threat to concrete evidence.
 
     Attributes:
-        type: The kind of reference (code, artifact, ticket, confluence, url).
+        type: The kind of reference (code, artifact, ticket, document, url).
         location: Where to find the evidence (file path, URL, ticket key).
         description: Brief explanation of what this reference proves.
         snippet: Optional code or text snippet as inline evidence.
     """
 
-    type: str  # "code", "artifact", "ticket", "confluence", "url"
+    type: str  # "code", "artifact", "ticket", "document", "url"
     location: str
     description: str
     snippet: str | None = None
@@ -308,7 +308,7 @@ class ThreatModelTemplate:
                                 "Evidence linking this threat to code or artifacts"
                             ),
                             "fields": {
-                                "type": ("code, artifact, ticket, confluence, or url"),
+                                "type": ("code, artifact, ticket, document, or url"),
                                 "location": ("File path, URL, or ticket key"),
                                 "description": ("What this reference proves"),
                                 "snippet": ("Optional inline code/text evidence"),

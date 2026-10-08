@@ -26,9 +26,6 @@ repos:
     -   id: mypy
         # TODO: Fix these type errors in future PRs:
         # - Union-attr errors in server.py (None checks needed)
-        # - Index error in jira_mocks.py (tests/fixtures/jira_mocks.py:421)
-        # - Assignment type errors in jira.py (str to int assignments)
-        # - Unreachable statements in preprocessing.py and jira.py
         args: [
             "--ignore-missing-imports",
             "--no-strict-optional",
@@ -45,16 +42,8 @@ repos:
             "--disable-error-code=annotation-unchecked",
         ]
         additional_dependencies: [
-            'types-beautifulsoup4',
-            'types-requests',
             'types-setuptools',
             'types-urllib3',
-            'types-cachetools',
-            'atlassian-python-api',
-            'beautifulsoup4',
             'httpx',
             'python-dotenv',
-            'markdownify',
-            'python-dateutil',
-            'types-python-dateutil',
         ]

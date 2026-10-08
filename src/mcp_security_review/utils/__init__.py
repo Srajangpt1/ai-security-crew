@@ -1,13 +1,6 @@
-"""Shared utilities.
-
-Only dependency-light helpers are re-exported here so the core package imports
-without the optional Atlassian extra. Atlassian-specific helpers (``date``,
-``oauth``, ``ssl``, ``urls``, ``decorators``) are imported from their modules.
-"""
+"""Shared utilities."""
 
 from .io import is_read_only_mode
-
-# Export lifecycle utilities
 from .lifecycle import (
     ensure_clean_exit,
     setup_signal_handlers,

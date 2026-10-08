@@ -44,11 +44,6 @@ logger = setup_logging(logging_level, logging_stream)
     "--env-file", type=click.Path(exists=True, dir_okay=False), help="Path to .env file"
 )
 @click.option(
-    "--oauth-setup",
-    is_flag=True,
-    help="Run OAuth 2.0 setup wizard for Atlassian Cloud",
-)
-@click.option(
     "--transport",
     type=click.Choice(["stdio", "sse", "streamable-http"]),
     default="stdio",
@@ -70,44 +65,6 @@ logger = setup_logging(logging_level, logging_stream)
     help="Path for Streamable HTTP transport (e.g., /mcp).",
 )
 @click.option(
-    "--confluence-url",
-    help="Confluence URL (e.g., https://your-domain.atlassian.net/wiki)",
-)
-@click.option("--confluence-username", help="Confluence username/email")
-@click.option("--confluence-token", help="Confluence API token")
-@click.option(
-    "--confluence-personal-token",
-    help="Confluence Personal Access Token (for Confluence Server/Data Center)",
-)
-@click.option(
-    "--confluence-ssl-verify/--no-confluence-ssl-verify",
-    default=True,
-    help="Verify SSL certificates for Confluence Server/Data Center (default: verify)",
-)
-@click.option(
-    "--confluence-spaces-filter",
-    help="Comma-separated list of Confluence space keys to filter search results",
-)
-@click.option(
-    "--jira-url",
-    help="Jira URL (e.g., https://your-domain.atlassian.net or https://jira.your-company.com)",
-)
-@click.option("--jira-username", help="Jira username/email (for Jira Cloud)")
-@click.option("--jira-token", help="Jira API token (for Jira Cloud)")
-@click.option(
-    "--jira-personal-token",
-    help="Jira Personal Access Token (for Jira Server/Data Center)",
-)
-@click.option(
-    "--jira-ssl-verify/--no-jira-ssl-verify",
-    default=True,
-    help="Verify SSL certificates for Jira Server/Data Center (default: verify)",
-)
-@click.option(
-    "--jira-projects-filter",
-    help="Comma-separated list of Jira project keys to filter search results",
-)
-@click.option(
     "--read-only",
     is_flag=True,
     help="Run in read-only mode (disables all write operations)",
@@ -116,69 +73,21 @@ logger = setup_logging(logging_level, logging_stream)
     "--enabled-tools",
     help="Comma-separated list of tools to enable (enables all if not specified)",
 )
-@click.option(
-    "--oauth-client-id",
-    help="OAuth 2.0 client ID for Atlassian Cloud",
-)
-@click.option(
-    "--oauth-client-secret",
-    help="OAuth 2.0 client secret for Atlassian Cloud",
-)
-@click.option(
-    "--oauth-redirect-uri",
-    help="OAuth 2.0 redirect URI for Atlassian Cloud",
-)
-@click.option(
-    "--oauth-scope",
-    help="OAuth 2.0 scopes (space-separated) for Atlassian Cloud",
-)
-@click.option(
-    "--oauth-cloud-id",
-    help="Atlassian Cloud ID for OAuth 2.0 authentication",
-)
-@click.option(
-    "--oauth-access-token",
-    help="Atlassian Cloud OAuth 2.0 access token (if you have your own you'd like to "
-    "use for the session.)",
-)
 def main(
     verbose: int,
     env_file: str | None,
-    oauth_setup: bool,
     transport: str,
     port: int,
     host: str,
     path: str | None,
-    confluence_url: str | None,
-    confluence_username: str | None,
-    confluence_token: str | None,
-    confluence_personal_token: str | None,
-    confluence_ssl_verify: bool,
-    confluence_spaces_filter: str | None,
-    jira_url: str | None,
-    jira_username: str | None,
-    jira_token: str | None,
-    jira_personal_token: str | None,
-    jira_ssl_verify: bool,
-    jira_projects_filter: str | None,
     read_only: bool,
     enabled_tools: str | None,
-    oauth_client_id: str | None,
-    oauth_client_secret: str | None,
-    oauth_redirect_uri: str | None,
-    oauth_scope: str | None,
-    oauth_cloud_id: str | None,
-    oauth_access_token: str | None,
 ) -> None:
     """MCP Security Review Server - Chill security reviews while vibe coding
 
     Perfect for staying in your coding flow while keeping security top of mind.
-    Quickly assess risks, check compliance, and document findings without breaking rhythm.
-    Supports both Atlassian Cloud and Jira Server/Data Center deployments.
-    Authentication methods supported:
-    - Username and API token (Cloud)
-    - Personal Access Token (Server/Data Center)
-    - OAuth 2.0 (Cloud only)
+    Quickly assess risks, check dependencies, and model threats without breaking
+    rhythm.
     """
     # Logging level logic
     if verbose == 1:
@@ -221,16 +130,6 @@ def main(
         )
         load_dotenv(override=True)
 
-    if oauth_setup:
-        logger.info("Starting OAuth 2.0 setup wizard")
-        try:
-            from .utils.oauth_setup import run_oauth_setup
-
-            sys.exit(run_oauth_setup())
-        except ImportError:
-            logger.error("Failed to import OAuth setup module.")
-            sys.exit(1)
-
     click_ctx = click.get_current_context(silent=True)
 
     # Transport precedence
@@ -269,44 +168,8 @@ def main(
     # Set env vars for downstream config
     if click_ctx and was_option_provided(click_ctx, "enabled_tools"):
         os.environ["ENABLED_TOOLS"] = enabled_tools
-    if click_ctx and was_option_provided(click_ctx, "confluence_url"):
-        os.environ["CONFLUENCE_URL"] = confluence_url
-    if click_ctx and was_option_provided(click_ctx, "confluence_username"):
-        os.environ["CONFLUENCE_USERNAME"] = confluence_username
-    if click_ctx and was_option_provided(click_ctx, "confluence_token"):
-        os.environ["CONFLUENCE_API_TOKEN"] = confluence_token
-    if click_ctx and was_option_provided(click_ctx, "confluence_personal_token"):
-        os.environ["CONFLUENCE_PERSONAL_TOKEN"] = confluence_personal_token
-    if click_ctx and was_option_provided(click_ctx, "jira_url"):
-        os.environ["JIRA_URL"] = jira_url
-    if click_ctx and was_option_provided(click_ctx, "jira_username"):
-        os.environ["JIRA_USERNAME"] = jira_username
-    if click_ctx and was_option_provided(click_ctx, "jira_token"):
-        os.environ["JIRA_API_TOKEN"] = jira_token
-    if click_ctx and was_option_provided(click_ctx, "jira_personal_token"):
-        os.environ["JIRA_PERSONAL_TOKEN"] = jira_personal_token
-    if click_ctx and was_option_provided(click_ctx, "oauth_client_id"):
-        os.environ["ATLASSIAN_OAUTH_CLIENT_ID"] = oauth_client_id
-    if click_ctx and was_option_provided(click_ctx, "oauth_client_secret"):
-        os.environ["ATLASSIAN_OAUTH_CLIENT_SECRET"] = oauth_client_secret
-    if click_ctx and was_option_provided(click_ctx, "oauth_redirect_uri"):
-        os.environ["ATLASSIAN_OAUTH_REDIRECT_URI"] = oauth_redirect_uri
-    if click_ctx and was_option_provided(click_ctx, "oauth_scope"):
-        os.environ["ATLASSIAN_OAUTH_SCOPE"] = oauth_scope
-    if click_ctx and was_option_provided(click_ctx, "oauth_cloud_id"):
-        os.environ["ATLASSIAN_OAUTH_CLOUD_ID"] = oauth_cloud_id
-    if click_ctx and was_option_provided(click_ctx, "oauth_access_token"):
-        os.environ["ATLASSIAN_OAUTH_ACCESS_TOKEN"] = oauth_access_token
     if click_ctx and was_option_provided(click_ctx, "read_only"):
         os.environ["READ_ONLY_MODE"] = str(read_only).lower()
-    if click_ctx and was_option_provided(click_ctx, "confluence_ssl_verify"):
-        os.environ["CONFLUENCE_SSL_VERIFY"] = str(confluence_ssl_verify).lower()
-    if click_ctx and was_option_provided(click_ctx, "confluence_spaces_filter"):
-        os.environ["CONFLUENCE_SPACES_FILTER"] = confluence_spaces_filter
-    if click_ctx and was_option_provided(click_ctx, "jira_ssl_verify"):
-        os.environ["JIRA_SSL_VERIFY"] = str(jira_ssl_verify).lower()
-    if click_ctx and was_option_provided(click_ctx, "jira_projects_filter"):
-        os.environ["JIRA_PROJECTS_FILTER"] = jira_projects_filter
 
     from mcp_security_review.servers import main_mcp
 

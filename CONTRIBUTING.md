@@ -13,7 +13,7 @@ Thank you for your interest in contributing to AI Security Crew! This document p
 
     ```sh
     uv sync
-    uv sync --frozen --all-extras --dev
+    uv sync --frozen --dev
     ```
 
 1. Activate the virtual environment:
@@ -121,4 +121,4 @@ Releases follow semantic versioning:
 
 ---
 
-Thank you for contributing to MCP Atlassian!
+Thank you for contributing to AI Security Crew!

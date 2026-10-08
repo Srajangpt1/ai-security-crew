@@ -15,7 +15,7 @@ ADD . /app
 
 # Install the project and its dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-dev --extra atlassian
+    uv sync --no-dev
 
 # Remove unnecessary files from the virtual environment before copying
 RUN find /app/.venv -name '__pycache__' -type d -exec rm -rf {} + && \
@@ -37,11 +37,5 @@ COPY --from=uv --chown=app:app /app/src /app/src
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
-
-# For minimal OAuth setup without environment variables, use:
-# docker run -e ATLASSIAN_OAUTH_ENABLE=true -p 8000:8000 your-image
-# Then provide authentication via headers:
-# Authorization: Bearer <your_oauth_token>
-# X-Atlassian-Cloud-Id: <your_cloud_id>
 
 ENTRYPOINT ["mcp-security-review"]

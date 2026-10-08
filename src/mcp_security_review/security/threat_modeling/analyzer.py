@@ -53,7 +53,7 @@ class ThreatModelAnalyzer:
                 - code_snippets: list[dict] with {file_path, code, language}
                 - data_flows: str describing data flows (text or mermaid)
                 - tech_stack: list[str] of technologies
-                - ticket_description: str from a Jira ticket
+                - ticket_description: str from an issue-tracker ticket
                 - architecture_notes: str with architecture context
                 - additional_context: str with any other context
             previous_models: Previous threat models for reference. Each dict

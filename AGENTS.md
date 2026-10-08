@@ -11,13 +11,12 @@ This file provides guidance for autonomous coding agents working inside the **AI
 | Path | Purpose |
 | --- | --- |
 | `src/mcp_security_review/` | Library source code (Python ≥ 3.10) |
-| `  ├─ providers/atlassian/` | Atlassian service providers (Jira, Confluence) |
-| `  ├─ models/atlassian/` | Pydantic data models for Atlassian APIs |
+| `  ├─ providers/sca/` | Package registry and OSV vulnerability providers |
 | `  ├─ servers/` | FastMCP server implementations |
 | `  ├─ security/` | Security assessment and guidelines |
-| `  └─ utils/` | Shared utilities (auth, logging, SSL) |
+| `  └─ utils/` | Shared utilities (env, logging, lifecycle) |
 | `tests/` | Pytest test suite with fixtures |
-| `scripts/` | OAuth setup and testing scripts |
+| `scripts/` | Guideline and assessment helper scripts |
 
 ---
 
@@ -27,7 +26,7 @@ This file provides guidance for autonomous coding agents working inside the **AI
 
 ### Before starting any coding task
 - Call `general_lightweight_security_review` with the task description and tech stack.
-- If working from a Jira ticket and `jira_assess_ticket_security` is available (needs the `atlassian` extra), call it instead.
+- If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), fetch it first with the matching MCP server you have connected and pass its details as the task description.
 - For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.
 
 ### When adding or updating packages
@@ -45,14 +44,14 @@ Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects
 
 ### Persisting threat models
 - After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.
-- If Confluence tools are available (needs the `atlassian` extra), call `threatmodel_search_previous_threat_models` first to avoid duplicating existing models.
+- If earlier threat models exist in a wiki or docs tool you have connected, fetch them first and pass them as `previous_models_json` to avoid duplicating work.
 
 ---
 
 ## Mandatory dev workflow
 
 ```bash
-uv sync --frozen --all-extras --dev  # install dependencies
+uv sync --frozen --dev  # install dependencies
 pre-commit install                    # setup hooks
 pre-commit run --all-files           # Ruff + Prettier + Pyright
 uv run pytest                        # run full test suite
@@ -64,12 +63,12 @@ uv run pytest                        # run full test suite
 
 ## Core MCP patterns
 
-**Tool naming**: `{provider}_{service}_{action}` (e.g., `atlassian_jira_create_issue`)
+**Tool naming**: `{server}_{tool}` (e.g., `sca_verify_packages`); each sub-server is mounted in `servers/main.py`
 
 **Architecture**:
-- **Mixins**: Functionality split into focused mixins extending base clients
-- **Models**: All data structures extend `ApiModel` base class
-- **Auth**: Supports API tokens, PAT tokens, and OAuth 2.0
+- **Servers**: One FastMCP sub-server per area (`general`, `threatmodel`, `sca`), mounted in `servers/main.py`
+- **Providers**: External lookups (OSV, PyPI, npm) live in `providers/`
+- **Tickets and docs**: No Jira/Confluence code here; agents fetch tickets with whatever MCP server the user has connected
 
 ---
 
@@ -110,7 +109,6 @@ uv run pytest                        # run full test suite
 ```bash
 # Running the server
 uv run mcp-security-review                 # Start server
-uv run mcp-security-review --oauth-setup   # OAuth wizard
 uv run mcp-security-review -v              # Verbose mode
 
 # Git workflow

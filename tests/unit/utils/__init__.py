@@ -1,1 +1,1 @@
-"""Unit tests for the MCP Atlassian utils module."""
+"""Unit tests for the utils module."""

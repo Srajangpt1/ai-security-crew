@@ -15,8 +15,6 @@ dependencies = [
     "uvicorn>=0.27.1",
     "starlette>=0.37.1",
     "thefuzz>=0.22.1",
-    "cachetools>=5.0.0",
-    "types-cachetools>=5.5.0.20240820",
 ]
 [[project.authors]]
 name = "Srajan Gupta"
@@ -24,19 +22,6 @@ name = "Srajan Gupta"
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
 build-backend = "hatchling.build"
-
-[project.optional-dependencies]
-atlassian = [
-    "atlassian-python-api>=4.0.0",
-    "requests[socks]>=2.31.0",
-    "beautifulsoup4>=4.12.3",
-    "markdownify>=0.11.6",
-    "markdown>=3.7.0",
-    "markdown-to-confluence>=0.3.0,<0.4.0",
-    "python-dateutil>=2.9.0.post0",
-    "types-python-dateutil>=2.9.0.20241206",
-    "keyring>=25.6.0",
-]
 
 [project.scripts]
 mcp-security-review = "mcp_security_review:main"
@@ -132,14 +117,6 @@ explicit_package_bases = true
 module = "tests.*"
 disallow_untyped_defs = false
 check_untyped_defs = false
-
-[[tool.mypy.overrides]]
-module = "atlassian.*"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = "markdownify.*"
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "src.mcp_security_review.*"

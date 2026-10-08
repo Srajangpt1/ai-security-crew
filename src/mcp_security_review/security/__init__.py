@@ -1,6 +1,6 @@
-"""Security assessment module for MCP Atlassian.
+"""Security assessment module for AI Security Crew.
 
-This module provides security assessment capabilities for Jira tickets,
+This module provides security assessment capabilities for tickets,
 generating security requirements and guidelines for code generation.
 It also provides code review context building for AI-powered security analysis.
 """

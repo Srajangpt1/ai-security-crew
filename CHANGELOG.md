@@ -8,12 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Changed — Jira and Confluence are now an optional extra
-- Core install (`pip install mcp-security-review`) no longer pulls Atlassian packages; it exposes the general, threat model and SCA tools only
-- Install `mcp-security-review[atlassian]` to enable Jira and Confluence tools (`assess_ticket_security`, `get_issue`, `search`, `get_page`)
-- `utils/__init__.py` re-exports only dependency-light helpers; import `parse_date`, OAuth and SSL helpers from their modules
-- Docker image installs the `atlassian` extra to keep its current behaviour
-- Agent workflow instructions use the exact prefixed tool names and mention Jira and Confluence tools only when the extra is installed
+### Removed — Jira and Confluence integration
+- Removed the Jira and Confluence tools (`jira_get_issue`, `jira_assess_ticket_security`, `confluence_search`, `confluence_get_page`) and `threatmodel_search_previous_threat_models`, plus the `atlassian` extra, OAuth setup, Jira/Confluence CLI flags and environment variables
+- Removed `providers/atlassian/`, `models/atlassian/`, `preprocessing/` and the Atlassian-only helpers in `utils/`; the `cachetools` dependency is gone too
+- Agent workflow instructions now tell the agent to fetch tickets and pages (Jira, Confluence, Linear, GitHub issues, and so on) with whichever MCP server the user has connected, then pass the details in
+- The core server now exposes 6 tools: `general_lightweight_security_review`, `general_verify_code_security`, `sca_verify_packages`, `sca_scan_dependencies`, `threatmodel_perform_threat_model`, `threatmodel_update_threat_model_file`
+- `NOTICE` now lists only the shared utilities that remain adapted from mcp-atlassian
 
 ### Changed — ownership and attribution
 - Package metadata now lists Srajan Gupta as author with a security-focused description

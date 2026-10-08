@@ -42,7 +42,6 @@ def setup_logging(
         "mcp-security-review",
         "mcp.server",
         "mcp.server.lowlevel.server",
-        "mcp-jira",
     ]
 
     for logger_name in loggers:
@@ -114,7 +113,7 @@ def log_config_param(
 
     Args:
         logger: The logger to use
-        service: The service name (Jira or Confluence)
+        service: The service name
         param: The parameter name
         value: The parameter value
         sensitive: Whether the value should be masked

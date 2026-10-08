@@ -33,14 +33,10 @@ jobs:
         cache: true
 
     - name: Install dependencies
-      run: uv sync --frozen --all-extras --dev
+      run: uv sync --frozen --dev
 
     - name: Run tests with pytest
       # Add -v for verbose output, helpful in CI
       # Add basic coverage reporting to terminal logs
       # Skip real API validation tests as they require credentials
       run: uv run pytest -v -k "not test_real_api_validation" --cov=src/mcp_security_review --cov-report=term-missing
-
-    - name: Core-only smoke test (no Atlassian extra)
-      # Fresh environment without optional extras; the server must still load.
-      run: uv run --isolated --frozen --dev pytest tests/unit/servers/test_core_without_atlassian.py -v
