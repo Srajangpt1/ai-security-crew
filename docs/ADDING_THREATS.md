@@ -59,6 +59,7 @@ disable: [open-redirect]                # optional: hide built-in entries by id
   countermeasure are dropped too.
 - Every reference must exist. Unknown fields, bad severities, and malformed CWE or ASVS
   ids are reported together, and the tool returns that list instead of a review.
+- A countermeasure with `baseline: true` is added to every code review checklist.
 - The risk level of a review is the highest severity among the threats on the components
   the agent picked. Sensitive data (`data_handled`) raises it one step.
 

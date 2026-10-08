@@ -5,6 +5,7 @@ from .library import (
     Library,
     Resolution,
     UnknownComponentError,
+    describe,
 )
 from .loader import LibraryError, load_library
 from .models import Component, Countermeasure, Severity, Threat
@@ -19,5 +20,6 @@ __all__ = [
     "Severity",
     "Threat",
     "UnknownComponentError",
+    "describe",
     "load_library",
 ]

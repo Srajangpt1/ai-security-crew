@@ -82,3 +82,5 @@ class Countermeasure(_Entry):
     how_to: Annotated[str, Field(min_length=1)]
     effort: Effort
     asvs: list[AsvsId] = Field(default_factory=list)
+    # Baseline countermeasures are included in every code review checklist.
+    baseline: bool = False

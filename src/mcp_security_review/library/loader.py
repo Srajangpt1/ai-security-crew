@@ -4,7 +4,7 @@ import logging
 from functools import lru_cache
 from importlib import resources
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ValidationError
@@ -21,8 +21,6 @@ _KINDS: dict[str, type[BaseModel]] = {
     "threats": Threat,
     "countermeasures": Countermeasure,
 }
-
-E = TypeVar("E", Component, Threat, Countermeasure)
 
 
 class LibraryError(ValueError):
@@ -65,11 +63,7 @@ def load_library(project_root: Path | None = None) -> Library:
     components = dict(builtin.components)
     threats = dict(builtin.threats)
     countermeasures = dict(builtin.countermeasures)
-    added: dict[str, set[str]] = {
-        "components": set(),
-        "threats": set(),
-        "countermeasures": set(),
-    }
+    added: dict[str, set[str]] = {kind: set() for kind in _KINDS}
     disabled: set[str] = set()
 
     for path in files:
@@ -150,7 +144,9 @@ def _builtin_library() -> Library:
     if errors:
         raise LibraryError(errors)
     library = Library(
-        loaded["components"], loaded["threats"], loaded["countermeasures"]
+        loaded["components"],
+        loaded["threats"],
+        loaded["countermeasures"],
     )
     check_references(library)
     return library

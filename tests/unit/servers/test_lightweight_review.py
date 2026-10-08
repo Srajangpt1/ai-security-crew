@@ -108,6 +108,14 @@ async def test_sensitive_data_raises_the_risk_level() -> None:
 
 
 @pytest.mark.anyio
+async def test_component_ids_tolerate_case_and_underscores() -> None:
+    data = await call(task_description="x", components="File_Upload, OBJECT_STORAGE")
+
+    assert data["success"] is True
+    assert data["assessment"]["components"] == ["file-upload", "object-storage"]
+
+
+@pytest.mark.anyio
 async def test_unknown_component_lists_valid_ids() -> None:
     data = await call(task_description="x", components="file-upload,teleporter")
 

@@ -28,7 +28,7 @@ This file provides guidance for autonomous coding agents working inside the **AI
 ### Before starting any coding task
 - Call `general_lightweight_security_review` with the task description. It returns a menu of components. Call it again with `components` set to the ids this change adds or modifies (usually 2 to 5) (and `data_handled` for credentials, payments, or personal data) to get the threats and countermeasures.
 - If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), fetch it first with the matching MCP server you have connected and pass its details as the task description.
-- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.
+- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model` with the same `components`.
 
 ### When adding or updating packages
 Run both steps before writing code that uses the new packages:
@@ -41,7 +41,7 @@ Run both steps before writing code that uses the new packages:
 Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects (`"pypi"` or `"npm"`).
 
 ### After generating code
-- Call `general_verify_code_security` with the generated code. Follow the `review_prompt` in the response to perform the analysis and report findings.
+- Call `general_verify_code_security` with the generated code and the same `components`. Follow the `review_prompt` in the response to perform the analysis and report findings.
 
 ### Persisting threat models
 - After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.

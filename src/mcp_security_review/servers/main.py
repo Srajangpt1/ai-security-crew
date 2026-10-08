@@ -112,7 +112,7 @@ AGENT_INSTRUCTIONS = (
     "- Call it a second time with the same description and `components` set to the ids of the components this change adds or directly modifies, usually 2 to 5 (add `data_handled` for credentials, payments, or personal data). The second call returns the threats to guard against and the countermeasures to build in.\n"  # noqa: E501
     "- Use this for any non-trivial coding task to identify risks upfront.\n"  # noqa: E501
     "- If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, Notion, and so on), fetch it first with the matching MCP server you have connected, then pass its summary, description, and acceptance criteria as the task description.\n"  # noqa: E501
-    "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.\n\n"  # noqa: E501
+    "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model` with the same `components`.\n\n"  # noqa: E501
     "## 2. When adding or updating dependencies\n"
     "Run both steps before writing any code that uses the new packages:\n"
     "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
@@ -120,7 +120,7 @@ AGENT_INSTRUCTIONS = (
     "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
     "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
     "## 3. After generating code\n"
-    "Call `general_verify_code_security` with the generated code.\n"
+    "Call `general_verify_code_security` with the generated code and the same `components`.\n"  # noqa: E501
     "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
     "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
     "## 4. Persisting threat models (optional)\n"

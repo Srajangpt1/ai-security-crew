@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — code review and threat modeling use the threat library
+- `verify_code_security` takes `components`, `data_handled`, and `project_root` instead of `security_context`. Its focus areas and checklist come from the library's threats and countermeasures for the components you name, plus a short baseline. There is no language detection; the agent adapts each fix to its own stack
+- `perform_threat_model` takes `components`, `data_handled`, and `project_root`, and returns `known_threats` (library threats and countermeasures, or the component menu) in place of `security_signals`
+- Countermeasures can be marked `baseline: true` to always appear in code review checklists
+- Removed the keyword analyzer (`security/analyzer.py`) and all regex-based technology detection
+
 ### Changed — threat library replaces the OWASP guideline files
 - `lightweight_security_review` now takes two calls: the first returns a menu of components (file upload, database, login, and so on); the second takes `components` (and optionally `data_handled`) and returns the threats to guard against and the countermeasures to build in. The calling agent picks the components, so there is no keyword matching
 - New built-in threat library in `src/mcp_security_review/library/`: 23 components, 83 threats (STRIDE, CWE), and 81 countermeasures that cite OWASP ASVS 5.0.0 requirement ids
