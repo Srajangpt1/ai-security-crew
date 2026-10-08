@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from mcp_security_review.security.analyzer import SecurityAnalyzer
+from mcp_security_review.library import Library, describe, load_library
 
 from .template import (
     ThreatEntry,
@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 class ThreatModelAnalyzer:
     """Orchestrates threat model generation with context enrichment.
 
-    Uses SecurityAnalyzer to extract technology and security context from
-    artifacts, then structures the output for the AI agent to complete.
+    Seeds the threat model with the library's known threats and countermeasures
+    for the components the agent names, then structures the output for the AI
+    agent to complete.
     """
 
-    def __init__(self) -> None:
-        self.security_analyzer = SecurityAnalyzer()
+    def __init__(self, library: Library | None = None) -> None:
+        self.library = library if library is not None else load_library()
         self.template = ThreatModelTemplate()
 
     def build_threat_model_context(
@@ -40,11 +41,13 @@ class ThreatModelAnalyzer:
         description: str,
         artifacts: dict[str, Any],
         previous_models: list[dict[str, Any]] | None = None,
+        components: list[str] | None = None,
+        data_handled: list[str] | None = None,
     ) -> dict[str, Any]:
         """Build the full context for the AI agent to generate a threat model.
 
-        Analyzes the provided artifacts for security signals, attaches the
-        template structure, and includes any previous threat models as reference.
+        Attaches the template structure, the library's known threats for the
+        named components, and any previous threat models as reference.
 
         Args:
             title: Name of the feature/component.
@@ -58,24 +61,16 @@ class ThreatModelAnalyzer:
                 - additional_context: str with any other context
             previous_models: Previous threat models for reference. Each dict
                 should have at minimum {title, source, content} or {title, url}.
+            components: Library component ids the feature involves.
+            data_handled: Kinds of sensitive data involved (raises the risk level).
 
         Returns:
             Dict containing everything the AI agent needs to produce a
             structured threat model.
+
+        Raises:
+            UnknownComponentError: If a component id is not in the library.
         """
-        # Analyze artifacts for security context
-        synthetic_text = self._build_synthetic_text(description, artifacts)
-        security_context = self.security_analyzer.analyze_ticket(
-            {
-                "summary": title,
-                "description": synthetic_text,
-                "fields": {
-                    "issuetype": {"name": "Threat Model"},
-                    "labels": artifacts.get("tech_stack", []),
-                },
-                "comments": [],
-            }
-        )
 
         # Build the context payload
         context: dict[str, Any] = {
@@ -85,18 +80,12 @@ class ThreatModelAnalyzer:
                 "description": description,
             },
             "artifacts": self._sanitize_artifacts(artifacts),
-            "security_signals": {
-                "technologies_detected": security_context.technologies,
-                "security_categories": list(security_context.security_categories),
-                "risk_level": security_context.risk_level,
-                "sensitive_data_types": list(security_context.sensitive_data_types),
-                "attack_vectors": list(security_context.attack_vectors),
-                "security_keywords_found": list(security_context.security_keywords),
-            },
+            "known_threats": self._known_threats(components, data_handled),
             "instructions": (
-                "Analyze the provided artifacts using the security signals "
-                "as hints. Generate a threat model following the template "
-                "structure. Each threat MUST reference specific evidence from "
+                "Analyze the provided artifacts using known_threats as a starting "
+                "checklist: keep the ones that apply, drop the ones that do not, "
+                "and add scenarios specific to these artifacts. Generate a threat "
+                "model following the template structure. Each threat MUST reference specific evidence from "
                 "the artifacts (code paths, data flows, architecture decisions). "
                 "Write threats in plain developer language. Focus on concrete "
                 "attack scenarios, not abstract categories."
@@ -179,35 +168,25 @@ class ThreatModelAnalyzer:
             summary=response_data.get("summary", ""),
         )
 
-    def _build_synthetic_text(
+    def _known_threats(
         self,
-        description: str,
-        artifacts: dict[str, Any],
-    ) -> str:
-        """Combine all artifact text for security analysis."""
-        parts = [description]
-
-        if artifacts.get("ticket_description"):
-            parts.append(str(artifacts["ticket_description"]))
-
-        if artifacts.get("architecture_notes"):
-            parts.append(str(artifacts["architecture_notes"]))
-
-        if artifacts.get("data_flows"):
-            parts.append(str(artifacts["data_flows"]))
-
-        if artifacts.get("additional_context"):
-            parts.append(str(artifacts["additional_context"]))
-
-        if artifacts.get("tech_stack"):
-            parts.append("Technologies: " + ", ".join(artifacts["tech_stack"]))
-
-        if artifacts.get("code_snippets"):
-            for snippet in artifacts["code_snippets"]:
-                if isinstance(snippet, dict):
-                    parts.append(snippet.get("code", ""))
-
-        return " ".join(parts)
+        components: list[str] | None,
+        data_handled: list[str] | None,
+    ) -> dict[str, Any]:
+        """Return library threats for the components, or the menu to pick from."""
+        if not components:
+            return {
+                "status": "needs_components",
+                "hint": (
+                    "No components were given, so there are no library threats. "
+                    "Call this tool again with components set to the ids of the "
+                    "parts this feature adds or changes (usually 2 to 5), or use "
+                    "the ids you picked in lightweight_security_review."
+                ),
+                "components": self.library.menu(),
+            }
+        resolution = self.library.resolve(components, data_handled)
+        return {"status": "from_library", **describe(resolution)}
 
     def _sanitize_artifacts(
         self,

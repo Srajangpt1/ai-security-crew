@@ -42,7 +42,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 | Tool | When to Use |
 |------|-------------|
 | `lightweight_security_review` | Before any coding task — pick the components involved, get the threats to guard against and the countermeasures to build in |
-| `perform_threat_model` | For significant new features — generate a structured threat model (STRIDE, attack surfaces) |
+| `perform_threat_model` | For significant new features — start a structured threat model from the library's known threats for the same components |
 
 ### Dependency security
 | Tool | When to Use |
@@ -53,7 +53,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Post-coding
 | Tool | When to Use |
 |------|-------------|
-| `verify_code_security` | After generating code — AI-powered security review of the generated code |
+| `verify_code_security` | After generating code — get a checklist aimed at the components' threats and the language, for your agent to review the code against |
 
 ### Threat model persistence
 | Tool | When to Use |

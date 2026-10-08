@@ -31,6 +31,10 @@ def test_instructions_describe_the_two_call_review() -> None:
     assert "`components`" in AGENT_INSTRUCTIONS
 
 
+def test_instructions_pass_the_same_components_to_later_tools() -> None:
+    assert "same `components`" in AGENT_INSTRUCTIONS
+
+
 def test_instructions_point_to_connected_ticket_tools() -> None:
     assert "ticket" in AGENT_INSTRUCTIONS
     assert "MCP server you have connected" in AGENT_INSTRUCTIONS

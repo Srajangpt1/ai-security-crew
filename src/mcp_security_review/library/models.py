@@ -82,3 +82,13 @@ class Countermeasure(_Entry):
     how_to: Annotated[str, Field(min_length=1)]
     effort: Effort
     asvs: list[AsvsId] = Field(default_factory=list)
+    # Baseline countermeasures are included in every code review checklist.
+    baseline: bool = False
+
+
+class Language(_Entry):
+    """Language hints for code review: file extensions, focus areas, and checks."""
+
+    extensions: list[Annotated[str, StringConstraints(pattern=r"^\.[a-z0-9]+$")]]
+    focus: list[str] = Field(default_factory=list)
+    checks: list[str] = Field(default_factory=list)

@@ -12,9 +12,15 @@ from mcp_security_review.library import (
     SENSITIVE_DATA_TYPES,
     LibraryError,
     UnknownComponentError,
+    describe,
     load_library,
 )
 from mcp_security_review.security import CodeReviewContextBuilder
+from mcp_security_review.servers.library_support import (
+    library_error,
+    split_ids,
+    unknown_component_error,
+)
 
 logger = logging.getLogger("mcp-security-review.servers.general")
 
@@ -26,11 +32,6 @@ general_mcp = FastMCP(
 
 MAX_ALSO_CONSIDER = 8
 MAX_TYPICAL_COMPONENTS = 6
-
-
-def _split_ids(value: str) -> list[str]:
-    """Split a comma- or space-separated list of ids, keeping order."""
-    return list(dict.fromkeys(p for p in value.replace(",", " ").split() if p))
 
 
 @general_mcp.tool(tags={"security", "review", "lightweight"})
@@ -112,23 +113,9 @@ async def lightweight_security_review(
         root = Path(project_root).expanduser() if project_root else None
         library = load_library(root)
     except LibraryError as e:
-        logger.error(f"Threat library is invalid: {e}")
-        return json.dumps(
-            {
-                "success": False,
-                "task_description": task_description,
-                "error": "The project's threat library files are invalid.",
-                "details": e.errors,
-                "hint": (
-                    "Fix the files in .ai-security-crew/library/ or remove them "
-                    "to use the built-in library."
-                ),
-            },
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
+        return library_error(e, {"task_description": task_description})
 
-    picked = _split_ids(components)
+    picked = split_ids(components)
     if not picked:
         return json.dumps(
             {
@@ -153,21 +140,11 @@ async def lightweight_security_review(
         )
 
     try:
-        result = library.resolve(picked, _split_ids(data_handled))
+        result = library.resolve(picked, split_ids(data_handled))
     except UnknownComponentError as e:
-        return json.dumps(
-            {
-                "success": False,
-                "task_description": task_description,
-                "error": str(e),
-                "valid_components": e.valid,
-                "hint": "Use ids from the component menu (call without components).",
-            },
-            separators=(",", ":"),
-            ensure_ascii=False,
-        )
+        return unknown_component_error(e, {"task_description": task_description})
 
-    implied = [c for c in result.components if c not in result.picked]
+    view = describe(result, MAX_ALSO_CONSIDER)
     broad_hint = (
         f"You picked {len(result.picked)} components. Most changes involve 2 to 5; "
         "pick only what this change adds or modifies for a shorter, more relevant "
@@ -175,7 +152,6 @@ async def lightweight_security_review(
         if len(result.picked) > MAX_TYPICAL_COMPONENTS
         else None
     )
-    shown_also = result.also_consider[:MAX_ALSO_CONSIDER]
     response = {
         "success": True,
         "review_type": "lightweight_pre_coding",
@@ -183,10 +159,7 @@ async def lightweight_security_review(
         "task_description": task_description,
         "technologies": [t.strip() for t in technologies.split(",") if t.strip()],
         "assessment": {
-            "risk_level": result.risk_level.value,
-            "components": result.picked,
-            "implied_components": implied,
-            "sensitive_data": result.sensitive_data,
+            **view,
             "summary": (
                 f"{len(result.threats)} threats and "
                 f"{len(result.countermeasures)} countermeasures for "
@@ -195,30 +168,6 @@ async def lightweight_security_review(
                 + (", raised for sensitive data" if result.sensitive_data else "")
                 + ")."
             ),
-            "threats": [
-                {
-                    "id": t.id,
-                    "name": t.name,
-                    "severity": t.severity.value,
-                    "cwe": t.cwe,
-                }
-                for t in result.threats
-            ],
-            "countermeasures": [
-                {
-                    "id": m.id,
-                    "name": m.name,
-                    "how_to": m.how_to,
-                    "effort": m.effort.value,
-                    "asvs": m.asvs,
-                    "mitigates": result.mitigates[m.id],
-                }
-                for m in result.countermeasures
-            ],
-            "also_consider": [
-                {"id": t.id, "name": t.name, "severity": t.severity.value}
-                for t in shown_also
-            ],
         },
         "hint": broad_hint,
         "instructions": (
@@ -226,7 +175,7 @@ async def lightweight_security_review(
             "most severe threats. These threats come from the components you "
             "picked. also_consider lists general threats from implied components; "
             "pass those components explicitly for full detail. After writing code, "
-            "call general_verify_code_security."
+            "call general_verify_code_security with the same components."
         ),
         "metadata": {
             "total_threats": len(result.threats),
@@ -252,12 +201,43 @@ async def verify_code_security(
             default="",
         ),
     ] = "",
-    security_context: Annotated[
+    components: Annotated[
         str,
         Field(
             description=(
-                "Optional JSON with security requirements from prior assessment. "
-                "Include 'security_categories', 'risk_level', and 'technologies'."
+                "Optional comma-separated component ids the code implements, "
+                "the same ids used in lightweight_security_review. Targets the "
+                "checklist at their threats."
+            ),
+            default="",
+        ),
+    ] = "",
+    data_handled: Annotated[
+        str,
+        Field(
+            description=(
+                "Optional comma-separated kinds of sensitive data involved: "
+                + ", ".join(SENSITIVE_DATA_TYPES)
+            ),
+            default="",
+        ),
+    ] = "",
+    language: Annotated[
+        str,
+        Field(
+            description=(
+                "Optional language id (python, javascript, typescript, react, "
+                "java, sql, go). Overrides the file extension."
+            ),
+            default="",
+        ),
+    ] = "",
+    project_root: Annotated[
+        str,
+        Field(
+            description=(
+                "Project folder whose .ai-security-crew/library/ files add custom "
+                "entries. Defaults to the server's working directory."
             ),
             default="",
         ),
@@ -271,29 +251,31 @@ async def verify_code_security(
 
     YOU (the AI) will perform the actual security analysis using:
     - The security checklist provided
-    - The focus areas based on detected technologies
-    - The security categories from prior assessments
+    - The focus areas for the language and the components you name
     - Your knowledge of security best practices
 
     Recommended workflow:
-    1. Run lightweight_security_review or assess_ticket_security BEFORE coding
-    2. Generate code following the security guidelines
-    3. Call this tool with the generated code
+    1. Run lightweight_security_review BEFORE coding and note the components
+    2. Generate code following the countermeasures it returns
+    3. Call this tool with the generated code and the same components
     4. Analyze the code following the review_prompt instructions
     5. Report findings and provide secure code fixes
 
     Args:
         ctx: The FastMCP context.
         code: The source code to review.
-        file_path: Optional file path for language detection.
-        security_context: Optional JSON with prior security requirements.
+        file_path: Optional file path; its extension selects the language.
+        components: Component ids the code implements (from the pre-coding review).
+        data_handled: Kinds of sensitive data involved (optional).
+        language: Optional language id, overrides the file extension.
+        project_root: Project folder with optional custom library files.
 
     Returns:
         JSON containing:
         - review_prompt: Detailed instructions for performing the security review
         - security_checklist: Items to verify in the code
         - focus_areas: Specific vulnerability types to look for
-        - technologies_detected: Languages/frameworks identified
+        - context: language, components, and risk level
         - code: The code to review (for reference)
 
     After receiving this response, analyze the code and provide:
@@ -303,27 +285,29 @@ async def verify_code_security(
     4. Checklist results
 
     Example:
-        verify_code_security(code="def login(): ...", file_path="auth.py")
+        verify_code_security(code="def login(): ...", file_path="auth.py",
+                             components="authentication")
     """
     try:
-        # Parse security context if provided
-        parsed_context = None
-        if security_context and security_context.strip():
-            try:
-                parsed_context = json.loads(security_context)
-            except json.JSONDecodeError:
-                logger.warning(
-                    "Invalid JSON in security_context, proceeding without context"
-                )
+        library = load_library(
+            Path(project_root).expanduser() if project_root else None
+        )
+    except LibraryError as e:
+        return library_error(e, {"code_to_review": code})
 
-        # Build review context
-        context_builder = CodeReviewContextBuilder()
+    try:
+        context_builder = CodeReviewContextBuilder(library)
         review_context = context_builder.build_review_context(
             code=code,
             file_path=file_path if file_path else None,
-            security_context=parsed_context,
+            components=split_ids(components) or None,
+            data_handled=split_ids(data_handled) or None,
+            language=language if language else None,
         )
+    except UnknownComponentError as e:
+        return unknown_component_error(e, {"code_to_review": code})
 
+    try:
         # Build response with all context needed for AI review
         response = {
             "success": True,
@@ -337,7 +321,7 @@ async def verify_code_security(
             "context": {
                 "file_path": file_path if file_path else "not_specified",
                 "technologies_detected": review_context.technologies_detected,
-                "security_categories": review_context.security_categories,
+                "components": review_context.components,
                 "risk_level": review_context.risk_level,
             },
             "security_checklist": review_context.security_checklist,
@@ -353,16 +337,12 @@ async def verify_code_security(
                 ],
             },
         }
-
-        # Add prior requirements if context was provided
-        if parsed_context:
-            response["prior_requirements"] = {
-                "from_assessment": True,
-                "security_categories": parsed_context.get("security_categories", []),
-                "technologies": parsed_context.get("technologies", []),
-                "risk_level": parsed_context.get("risk_level", "medium"),
-                "note": "Verify the code meets these security requirements.",
-            }
+        if not review_context.components:
+            response["hint"] = (
+                "No components were given, so the checklist is generic. Pass the "
+                "component ids from lightweight_security_review for a checklist "
+                "aimed at this code's threats."
+            )
 
         return json.dumps(response, indent=2, ensure_ascii=False)
 

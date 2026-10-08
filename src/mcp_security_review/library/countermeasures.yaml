@@ -5,6 +5,7 @@
 #   effort    low | medium | high
 #   asvs      OWASP ASVS 5.0.0 requirement ids (format v5.0.0-<chapter>.<section>.<item>)
 #             that back this control; empty when ASVS has no matching requirement
+#   baseline  (optional) true = included in every code review checklist
 countermeasures:
   # ---- Web and API -----------------------------------------------------------
   - id: csrf-protection
@@ -54,6 +55,7 @@ countermeasures:
     how_to: Check type, length, range, and format for every input on the server. Client-side checks are only for convenience.
     effort: low
     asvs: [v5.0.0-2.2.1, v5.0.0-2.2.2]
+    baseline: true
 
   - id: enforce-flow-order
     name: Enforce step order and limits on the server
@@ -176,6 +178,7 @@ countermeasures:
     how_to: Pass user values as parameters. Never build SQL or query documents by joining strings.
     effort: low
     asvs: [v5.0.0-1.2.4]
+    baseline: true
 
   - id: least-privilege-accounts
     name: Give the app a least-privilege database account
@@ -299,6 +302,7 @@ countermeasures:
     how_to: Keep secrets out of code, images, and the repo. Use environment variables or a vault, scope access narrowly, and rotate anything that leaked.
     effort: medium
     asvs: [v5.0.0-13.3.1, v5.0.0-13.3.2]
+    baseline: true
 
   - id: disable-debug-in-prod
     name: Turn debug features off in production
@@ -423,12 +427,14 @@ countermeasures:
     how_to: Show a short message and a request id, log the details server-side, and use the same wording for unknown and wrong credentials.
     effort: low
     asvs: [v5.0.0-16.5.1]
+    baseline: true
 
   - id: log-without-secrets
     name: Keep secrets and personal data out of logs
     how_to: Mask tokens, passwords, card numbers, and personal fields before logging, and avoid logging whole request bodies.
     effort: low
     asvs: [v5.0.0-16.2.5]
+    baseline: true
 
   - id: log-security-events
     name: Log security-relevant events

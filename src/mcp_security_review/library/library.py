@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .models import SEVERITY_RANK, Component, Countermeasure, Severity, Threat
+from .models import SEVERITY_RANK, Component, Countermeasure, Language, Severity, Threat
 
 SENSITIVE_DATA_TYPES = (
     "credentials",
@@ -53,6 +53,24 @@ class Library:
     components: dict[str, Component]
     threats: dict[str, Threat]
     countermeasures: dict[str, Countermeasure]
+    languages: dict[str, Language] = field(default_factory=dict)
+
+    def language_for(
+        self, file_path: str | None = None, language: str | None = None
+    ) -> Language | None:
+        """Find a language by explicit id, or by the file extension of a path."""
+        if language:
+            return self.languages.get(language.strip().lower())
+        if file_path:
+            lowered = file_path.lower()
+            for candidate in self.languages.values():
+                if any(lowered.endswith(ext) for ext in candidate.extensions):
+                    return candidate
+        return None
+
+    def baseline_countermeasures(self) -> list[Countermeasure]:
+        """Countermeasures that belong in every code review checklist."""
+        return [m for m in self.countermeasures.values() if m.baseline]
 
     def menu(self) -> list[dict[str, str]]:
         """Return the component menu shown to the agent."""
@@ -120,7 +138,10 @@ class Library:
                     ordered_ids.append(cm_id)
                 mitigates[cm_id].append(threat.id)
 
-        sensitive = [s for s in (sensitive_data or []) if s in SENSITIVE_DATA_TYPES]
+        normalized = (s.strip().lower().replace("-", "_") for s in sensitive_data or [])
+        sensitive = list(
+            dict.fromkeys(s for s in normalized if s in SENSITIVE_DATA_TYPES)
+        )
         return Resolution(
             components=expanded,
             picked=list(dict.fromkeys(component_ids)),
@@ -155,4 +176,40 @@ def summarize(resolution: Resolution) -> dict[str, Any]:
         "threats": len(resolution.threats),
         "countermeasures": len(resolution.countermeasures),
         "by_severity": by_severity,
+    }
+
+
+def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, Any]:
+    """Return the compact, JSON-ready view of a resolution used by the tools."""
+    return {
+        "risk_level": resolution.risk_level.value,
+        "components": resolution.picked,
+        "implied_components": [
+            c for c in resolution.components if c not in resolution.picked
+        ],
+        "sensitive_data": resolution.sensitive_data,
+        "threats": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "severity": t.severity.value,
+                "cwe": t.cwe,
+            }
+            for t in resolution.threats
+        ],
+        "countermeasures": [
+            {
+                "id": m.id,
+                "name": m.name,
+                "how_to": m.how_to,
+                "effort": m.effort.value,
+                "asvs": m.asvs,
+                "mitigates": resolution.mitigates[m.id],
+            }
+            for m in resolution.countermeasures
+        ],
+        "also_consider": [
+            {"id": t.id, "name": t.name, "severity": t.severity.value}
+            for t in resolution.also_consider[:max_also_consider]
+        ],
     }

@@ -111,6 +111,13 @@ def test_sensitive_data_raises_risk_one_step(library: Library) -> None:
     assert raised.sensitive_data == ["personal_data"]
 
 
+def test_sensitive_data_kinds_accept_hyphens_and_case(library: Library) -> None:
+    result = library.resolve(["file-upload"], ["Personal-Data", "personal_data"])
+
+    assert result.sensitive_data == ["personal_data"]
+    assert result.risk_level is Severity.CRITICAL
+
+
 def test_unknown_sensitive_data_kinds_are_ignored(library: Library) -> None:
     result = library.resolve(["file-upload"], ["favorite_color"])
     assert result.sensitive_data == []

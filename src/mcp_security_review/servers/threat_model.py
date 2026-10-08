@@ -6,14 +6,26 @@ file.
 
 import json
 import logging
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from mcp_security_review.library import (
+    SENSITIVE_DATA_TYPES,
+    LibraryError,
+    UnknownComponentError,
+    load_library,
+)
 from mcp_security_review.security.threat_modeling import (
     ThreatModelAnalyzer,
     ThreatModelTemplate,
+)
+from mcp_security_review.servers.library_support import (
+    library_error,
+    split_ids,
+    unknown_component_error,
 )
 
 logger = logging.getLogger("mcp-security-review.servers.threat_model")
@@ -90,6 +102,38 @@ async def perform_threat_model(
             default="",
         ),
     ] = "",
+    components: Annotated[
+        str,
+        Field(
+            description=(
+                "Optional comma-separated component ids the feature involves, the "
+                "same ids used in lightweight_security_review. Adds the library's "
+                "known threats and countermeasures for them. Leave empty to get "
+                "the component menu."
+            ),
+            default="",
+        ),
+    ] = "",
+    data_handled: Annotated[
+        str,
+        Field(
+            description=(
+                "Optional comma-separated kinds of sensitive data involved: "
+                + ", ".join(SENSITIVE_DATA_TYPES)
+            ),
+            default="",
+        ),
+    ] = "",
+    project_root: Annotated[
+        str,
+        Field(
+            description=(
+                "Project folder whose .ai-security-crew/library/ files add custom "
+                "entries. Defaults to the server's working directory."
+            ),
+            default="",
+        ),
+    ] = "",
     previous_models_json: Annotated[
         str,
         Field(
@@ -104,13 +148,12 @@ async def perform_threat_model(
 ) -> str:
     """Generate a developer-focused threat model for a feature or component.
 
-    This tool analyzes the provided artifacts, enriches them with security
-    signals (technologies, attack vectors, sensitive data patterns), and
-    returns a structured context for you (the AI agent) to produce the
-    actual threat model.
+    This tool takes the provided artifacts, adds the library's known threats
+    and countermeasures for the components you name, and returns a structured
+    context for you (the AI agent) to produce the actual threat model.
 
     YOU (the AI agent) will:
-    1. Analyze the artifacts and security signals provided
+    1. Analyze the artifacts, using the known threats as a starting checklist
     2. Identify concrete threats with plain-language attack scenarios
     3. Link each threat to evidence from the provided artifacts
     4. Suggest mitigations for each identified threat
@@ -133,13 +176,17 @@ async def perform_threat_model(
         tech_stack: Comma-separated technologies.
         architecture_notes: Architecture context.
         additional_context: Any other relevant context.
+        components: Component ids the feature involves (from the menu).
+        data_handled: Kinds of sensitive data involved (optional).
+        project_root: Project folder with optional custom library files.
         previous_models_json: Previous threat models as JSON for reference.
 
     Returns:
         JSON containing:
         - template: The threat model structure to follow
         - artifacts: The provided artifacts for analysis
-        - security_signals: Auto-detected security context
+        - known_threats: Library threats and countermeasures for the components
+          (or the component menu when none were given)
         - previous_threat_models: Reference models (if provided)
         - instructions: How to produce the threat model
         - suggest_file_update: Whether to prompt the user about threat-model.md
@@ -149,6 +196,7 @@ async def perform_threat_model(
             title="JWT Auth Migration",
             description="Migrating from session-based auth to JWT tokens",
             tech_stack="Python, FastAPI, Redis",
+            components="authentication,session-management",
             data_flows="User -> API Gateway -> Auth Service -> Redis (token store)"
         )
     """
@@ -203,13 +251,27 @@ async def perform_threat_model(
             artifacts["additional_context"] = additional_context
 
         # Build threat model context
-        analyzer = ThreatModelAnalyzer()
-        context = analyzer.build_threat_model_context(
-            title=title,
-            description=description,
-            artifacts=artifacts,
-            previous_models=parsed_previous_models or None,
-        )
+        try:
+            library = load_library(
+                Path(project_root).expanduser() if project_root else None
+            )
+        except LibraryError as e:
+            return library_error(
+                e, {"template": ThreatModelTemplate.get_template_structure()}
+            )
+
+        analyzer = ThreatModelAnalyzer(library)
+        try:
+            context = analyzer.build_threat_model_context(
+                title=title,
+                description=description,
+                artifacts=artifacts,
+                previous_models=parsed_previous_models or None,
+                components=split_ids(components) or None,
+                data_handled=split_ids(data_handled) or None,
+            )
+        except UnknownComponentError as e:
+            return unknown_component_error(e, {"title": title})
 
         # Wrap with metadata
         response: dict[str, Any] = {
@@ -217,7 +279,7 @@ async def perform_threat_model(
             "tool": "perform_threat_model",
             **context,
             "output_instructions": (
-                "After analyzing the artifacts and security signals, return "
+                "After analyzing the artifacts and known threats, return "
                 "a JSON object matching the template structure with all "
                 "threats identified. Each threat MUST include at least one "
                 "reference with evidence. Use the parse format described in "

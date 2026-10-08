@@ -1,0 +1,101 @@
+# Languages: hints for code review, chosen by the `language` argument or the file
+# extension of the reviewed file. No code is scanned to guess the language.
+#   id          stable slug
+#   extensions  file extensions that select this language
+#   focus       vulnerability types to look for in this language
+#   checks      checklist lines specific to this language
+languages:
+  - id: python
+    name: Python
+    extensions: [.py]
+    focus:
+      - Command injection via os.system/subprocess
+      - SQL injection in database queries
+      - Unsafe deserialization (pickle)
+      - eval/exec usage
+    checks:
+      - No use of eval() or exec() with user input
+      - No pickle.loads() on untrusted data
+      - subprocess calls use shell=False
+
+  - id: javascript
+    name: JavaScript
+    extensions: [.js]
+    focus:
+      - XSS vulnerabilities (innerHTML, document.write)
+      - Prototype pollution
+      - eval() and Function() usage
+      - Insecure DOM manipulation
+    checks:
+      - No innerHTML with unsanitized content
+      - No document.write() usage
+      - No eval() or new Function() with dynamic content
+
+  - id: typescript
+    name: TypeScript
+    extensions: [.ts]
+    focus:
+      - Type safety bypasses
+      - XSS in template literals
+      - Unsafe type assertions
+    checks:
+      - No innerHTML with unsanitized content
+      - No document.write() usage
+      - No eval() or new Function() with dynamic content
+
+  - id: react
+    name: React
+    extensions: [.jsx, .tsx]
+    focus:
+      - dangerouslySetInnerHTML usage
+      - XSS in JSX
+      - Unsafe refs and state handling
+    checks:
+      - dangerouslySetInnerHTML is sanitized if used
+      - User input in JSX is properly escaped
+
+  - id: java
+    name: Java
+    extensions: [.java]
+    focus:
+      - SQL injection with Statement
+      - XML External Entity (XXE)
+      - Unsafe deserialization
+      - Command injection via Runtime.exec
+    checks:
+      - PreparedStatement used instead of Statement for SQL
+      - No Runtime.exec() with user-controlled input
+
+  - id: sql
+    name: SQL
+    extensions: [.sql]
+    focus:
+      - SQL injection patterns
+      - Privilege escalation queries
+      - Data exposure (SELECT *)
+      - Missing WHERE clauses on UPDATE/DELETE
+
+  - id: go
+    name: Go
+    extensions: [.go]
+    focus:
+      - SQL injection
+      - Command injection
+      - Path traversal
+      - Race conditions
+
+  - id: ruby
+    name: Ruby
+    extensions: [.rb]
+
+  - id: php
+    name: PHP
+    extensions: [.php]
+
+  - id: csharp
+    name: C#
+    extensions: [.cs]
+
+  - id: rust
+    name: Rust
+    extensions: [.rs]

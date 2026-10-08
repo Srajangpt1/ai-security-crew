@@ -5,19 +5,22 @@ from .library import (
     Library,
     Resolution,
     UnknownComponentError,
+    describe,
 )
 from .loader import LibraryError, load_library
-from .models import Component, Countermeasure, Severity, Threat
+from .models import Component, Countermeasure, Language, Severity, Threat
 
 __all__ = [
     "SENSITIVE_DATA_TYPES",
     "Component",
     "Countermeasure",
+    "Language",
     "Library",
     "LibraryError",
     "Resolution",
     "Severity",
     "Threat",
     "UnknownComponentError",
+    "describe",
     "load_library",
 ]
