@@ -8,5 +8,10 @@ src/mcp_security_review/servers/ are adapted from mcp-atlassian
 Copyright (c) 2024 Hyeonsoo Lee. The upstream license text is preserved in
 LICENSE.
 
+The threat library in src/mcp_security_review/library/ refers to requirement ids
+from the OWASP Application Security Verification Standard (ASVS) 5.0.0
+(https://github.com/OWASP/ASVS, CC BY-SA 4.0) and to MITRE CWE identifiers
+(https://cwe.mitre.org). Only identifiers are used; all descriptive text is original.
+
 All other code, including everything under src/mcp_security_review/security/
 and src/mcp_security_review/providers/sca/, is original to this project.
