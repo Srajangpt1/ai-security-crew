@@ -43,6 +43,7 @@ repos:
         ]
         additional_dependencies: [
             'types-setuptools',
+            'types-pyyaml',
             'types-urllib3',
             'httpx',
             'python-dotenv',

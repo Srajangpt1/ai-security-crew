@@ -41,7 +41,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Pre-coding
 | Tool | When to Use |
 |------|-------------|
-| `lightweight_security_review` | Before any coding task — get security requirements and guidelines for your tech stack |
+| `lightweight_security_review` | Before any coding task — pick the components involved, get the threats to guard against and the countermeasures to build in |
 | `perform_threat_model` | For significant new features — generate a structured threat model (STRIDE, attack surfaces) |
 
 ### Dependency security
@@ -53,7 +53,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Post-coding
 | Tool | When to Use |
 |------|-------------|
-| `verify_code_security` | After generating code — AI-powered security review against OWASP guidelines |
+| `verify_code_security` | After generating code — AI-powered security review of the generated code |
 
 ### Threat model persistence
 | Tool | When to Use |
@@ -121,26 +121,28 @@ docker run --rm -p 8000:8000 mcp-security-review:latest --transport streamable-h
 docker run --rm -p 8000:8000 mcp-security-review:latest --transport sse
 ```
 
-## Security Guidelines
+## Threat Library
 
-Includes **101 OWASP Cheat Sheets** loaded automatically into security assessments. Add your own org-specific guidelines:
+`lightweight_security_review` is backed by a built-in library of **23 components**, **83 threats**, and **81 countermeasures** (web and API apps, plus LLM, agent, and MCP features). Threats carry STRIDE and CWE references, and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids.
 
-```bash
-python3 scripts/add_custom_guideline.py
+The agent calls the tool twice: the first call returns a menu of components, the second takes the ids that apply and returns the threats and countermeasures.
+
+Add your own components, threats, and countermeasures in `.ai-security-crew/library/*.yaml` in your repo:
+
+```yaml
+components:
+  - id: internal-sso
+    name: Company SSO
+    applies_when: The feature signs users in through our SSO.
+threats:
+  - id: sso-token-reuse
+    name: A token for one app is reused on another
+    components: [internal-sso]
+    severity: high
+    countermeasures: [validate-token-claims]
 ```
 
-Or manually create markdown files in `src/mcp_security_review/security/guidelines/docs/`:
-
-```markdown
-category: your_category
-priority: high
-tags: tag1, tag2, tag3
-
-# Your Guideline Title
-...
-```
-
-See [docs/ADDING_CUSTOM_GUIDELINES.md](docs/ADDING_CUSTOM_GUIDELINES.md) for details.
+See [docs/ADDING_THREATS.md](docs/ADDING_THREATS.md) for the full format.
 
 ## Contributing
 

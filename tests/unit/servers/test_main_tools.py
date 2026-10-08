@@ -26,6 +26,11 @@ def test_instructions_name_every_workflow_tool() -> None:
         assert name in AGENT_INSTRUCTIONS
 
 
+def test_instructions_describe_the_two_call_review() -> None:
+    assert "second time" in AGENT_INSTRUCTIONS
+    assert "`components`" in AGENT_INSTRUCTIONS
+
+
 def test_instructions_point_to_connected_ticket_tools() -> None:
     assert "ticket" in AGENT_INSTRUCTIONS
     assert "MCP server you have connected" in AGENT_INSTRUCTIONS

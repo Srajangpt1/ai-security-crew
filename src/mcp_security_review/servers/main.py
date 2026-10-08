@@ -108,8 +108,9 @@ AGENT_INSTRUCTIONS = (
     "# Security Review MCP — Agent Workflow\n\n"
     "Follow this workflow whenever you write or modify code.\n\n"
     "## 1. Before you start coding\n"
-    "Call `general_lightweight_security_review` with a description of what you're building and the tech stack.\n"  # noqa: E501
-    "- Use this for any non-trivial coding task to identify risks and get security guidelines upfront.\n"  # noqa: E501
+    "Call `general_lightweight_security_review` with a description of what you're building. It returns a menu of components (file upload, database, login, and so on).\n"  # noqa: E501
+    "- Call it a second time with the same description and `components` set to the ids of the components this change adds or directly modifies, usually 2 to 5 (add `data_handled` for credentials, payments, or personal data). The second call returns the threats to guard against and the countermeasures to build in.\n"  # noqa: E501
+    "- Use this for any non-trivial coding task to identify risks upfront.\n"  # noqa: E501
     "- If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, Notion, and so on), fetch it first with the matching MCP server you have connected, then pass its summary, description, and acceptance criteria as the task description.\n"  # noqa: E501
     "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.\n\n"  # noqa: E501
     "## 2. When adding or updating dependencies\n"

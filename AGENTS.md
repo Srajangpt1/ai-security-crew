@@ -13,7 +13,8 @@ This file provides guidance for autonomous coding agents working inside the **AI
 | `src/mcp_security_review/` | Library source code (Python ≥ 3.10) |
 | `  ├─ providers/sca/` | Package registry and OSV vulnerability providers |
 | `  ├─ servers/` | FastMCP server implementations |
-| `  ├─ security/` | Security assessment and guidelines |
+| `  ├─ library/` | Threat library: components, threats, countermeasures (YAML) |
+| `  ├─ security/` | Code review context and threat modeling |
 | `  └─ utils/` | Shared utilities (env, logging, lifecycle) |
 | `tests/` | Pytest test suite with fixtures |
 | `scripts/` | Guideline and assessment helper scripts |
@@ -25,7 +26,7 @@ This file provides guidance for autonomous coding agents working inside the **AI
 > **Note**: This workflow is also delivered to end users automatically via the MCP server's `instructions` field on connect. Changes here should stay in sync with `servers/main.py`.
 
 ### Before starting any coding task
-- Call `general_lightweight_security_review` with the task description and tech stack.
+- Call `general_lightweight_security_review` with the task description. It returns a menu of components. Call it again with `components` set to the ids this change adds or modifies (usually 2 to 5) (and `data_handled` for credentials, payments, or personal data) to get the threats and countermeasures.
 - If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), fetch it first with the matching MCP server you have connected and pass its details as the task description.
 - For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.
 

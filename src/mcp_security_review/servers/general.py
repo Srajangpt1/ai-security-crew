@@ -2,12 +2,19 @@
 
 import json
 import logging
+from pathlib import Path
 from typing import Annotated
 
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
-from mcp_security_review.security import CodeReviewContextBuilder, SecurityAssessment
+from mcp_security_review.library import (
+    SENSITIVE_DATA_TYPES,
+    LibraryError,
+    UnknownComponentError,
+    load_library,
+)
+from mcp_security_review.security import CodeReviewContextBuilder
 
 logger = logging.getLogger("mcp-security-review.servers.general")
 
@@ -17,6 +24,15 @@ general_mcp = FastMCP(
 )
 
 
+MAX_ALSO_CONSIDER = 8
+MAX_TYPICAL_COMPONENTS = 6
+
+
+def _split_ids(value: str) -> list[str]:
+    """Split a comma- or space-separated list of ids, keeping order."""
+    return list(dict.fromkeys(p for p in value.replace(",", " ").split() if p))
+
+
 @general_mcp.tool(tags={"security", "review", "lightweight"})
 async def lightweight_security_review(
     ctx: Context,
@@ -24,6 +40,27 @@ async def lightweight_security_review(
         str,
         Field(description="Description of the coding task or feature to implement"),
     ],
+    components: Annotated[
+        str,
+        Field(
+            description=(
+                "Comma-separated component ids the task involves, chosen from the "
+                "menu this tool returns when called without components. Leave "
+                "empty on the first call to get the menu."
+            ),
+            default="",
+        ),
+    ] = "",
+    data_handled: Annotated[
+        str,
+        Field(
+            description=(
+                "Optional comma-separated kinds of sensitive data involved: "
+                + ", ".join(SENSITIVE_DATA_TYPES)
+            ),
+            default="",
+        ),
+    ] = "",
     technologies: Annotated[
         str,
         Field(
@@ -31,142 +68,174 @@ async def lightweight_security_review(
             default="",
         ),
     ] = "",
-    include_guidelines: Annotated[  # noqa: FBT002
-        bool,
+    project_root: Annotated[
+        str,
         Field(
-            description="Whether to include detailed security guidelines",
-            default=True,
+            description=(
+                "Project folder. Its .ai-security-crew/library/ files add custom "
+                "components, threats, and countermeasures. Defaults to the "
+                "server's working directory."
+            ),
+            default="",
         ),
-    ] = True,
-    include_prompt_injection: Annotated[  # noqa: FBT002
-        bool,
-        Field(
-            description="Whether to include formatted prompt injection",
-            default=True,
-        ),
-    ] = True,
+    ] = "",
 ) -> str:
-    """Perform a lightweight security review before coding.
+    """Perform a lightweight security review before coding (two calls).
 
-    This tool provides immediate security guidance for any coding task,
-    helping developers build security considerations into their work
-    from the start. Designed for "vibe coding" workflow.
+    Call 1: pass only task_description. You get a menu of components (things
+    like file upload, database, login). Call 2: pass the same task_description
+    with the ids of every component the task involves in components. You get
+    the threats to guard against and the countermeasures to build in.
 
-    Use this BEFORE starting any coding task to:
-    - Identify potential security risks early
-    - Get relevant security guidelines for your tech stack
-    - Generate security-aware prompts for AI code generation
-    - Ensure security is built-in, not bolted-on
+    Use this BEFORE starting any coding task so security is built in from the
+    start. Pass data_handled when the feature touches credentials, payments, or
+    personal data, which raises the risk level one step.
 
     Args:
         ctx: The FastMCP context.
         task_description: What you're planning to build or implement.
-        technologies: Tech stack involved (optional but recommended).
-        include_guidelines: Whether to include detailed security guidelines.
-        include_prompt_injection: Whether to include formatted prompt injection.
+        components: Component ids from the menu (second call).
+        data_handled: Kinds of sensitive data involved (optional).
+        technologies: Tech stack involved (optional, echoed back).
+        project_root: Project folder with optional custom library files.
 
     Returns:
-        JSON string containing security review results including:
-        - Risk level assessment
-        - Relevant security categories
-        - Technology-specific security considerations
-        - Actionable security guidelines
-        - Formatted prompt injection for secure code generation
+        JSON. Without components: status "needs_components" and the menu. With
+        components: status "complete" with the risk level, threats (most severe
+        first), and the countermeasures that mitigate them.
 
     Example:
-        lightweight_security_review("Build login form", "React, Node.js")
+        lightweight_security_review("Add avatar upload")
+        lightweight_security_review("Add avatar upload", components="file-upload")
     """
     try:
-        synthetic_ticket = {
-            "summary": task_description,
-            "description": f"Task: {task_description}\nTechnologies: {technologies}",
-            "fields": {
-                "issuetype": {"name": "Development Task"},
-                "priority": {"name": "Medium"},
-                "labels": technologies.lower().split(", ") if technologies else [],
+        root = Path(project_root).expanduser() if project_root else None
+        library = load_library(root)
+    except LibraryError as e:
+        logger.error(f"Threat library is invalid: {e}")
+        return json.dumps(
+            {
+                "success": False,
+                "task_description": task_description,
+                "error": "The project's threat library files are invalid.",
+                "details": e.errors,
+                "hint": (
+                    "Fix the files in .ai-security-crew/library/ or remove them "
+                    "to use the built-in library."
+                ),
             },
-            "comments": [],
-        }
-
-        security_assessment = SecurityAssessment()
-        requirements = security_assessment.assess_ticket(synthetic_ticket)
-
-        response = {
-            "success": True,
-            "task_description": task_description,
-            "review_type": "lightweight_pre_coding",
-            "assessment": {
-                "risk_level": requirements.risk_level,
-                "security_categories": requirements.security_categories,
-                "technologies": requirements.technologies,
-                "summary": f"Pre-coding security review: {requirements.summary}",
-                "recommendations": [
-                    "Review security guidelines before implementing",
-                    "Use the provided prompt injection for AI code generation",
-                    "Consider security implications at each development step",
-                    "Validate all inputs and sanitize outputs",
-                    "Follow principle of least privilege",
-                ],
-            },
-        }
-
-        if include_guidelines:
-            response["assessment"]["guidelines"] = requirements.guidelines
-
-        if include_prompt_injection:
-            prompt_prefix = " PRE-CODING SECURITY REVIEW:\n\n"
-            prompt_prefix += (
-                "IMPORTANT: Apply these security considerations "
-                "BEFORE and DURING coding:\n\n"
-            )
-            response["assessment"]["prompt_injection"] = (
-                prompt_prefix + requirements.prompt_injection
-            )
-
-        response["metadata"] = {
-            "total_guidelines": len(requirements.guidelines),
-            "review_timestamp": "pre-coding",
-            "review_purpose": "lightweight_security_guidance",
-            "integration_workflow": "vibe_coding",
-        }
-
-        return json.dumps(response, indent=2, ensure_ascii=False)
-
-    except (ValueError, KeyError, TypeError) as e:
-        error_message = str(e)
-        logger.error(f"Lightweight security review failed: {error_message}")
-
-        fallback_injection = (
-            "SECURITY REQUIREMENTS:\n\n"
-            "Apply basic security practices:\n"
-            "- Input validation\n"
-            "- Output encoding\n"
-            "- Secure authentication\n"
-            "- Error handling\n"
-            "- Logging and monitoring"
+            separators=(",", ":"),
+            ensure_ascii=False,
         )
 
-        fallback_response = {
-            "success": False,
-            "task_description": task_description,
-            "error": error_message,
-            "assessment": {
-                "risk_level": "medium",
-                "security_categories": ["general"],
-                "technologies": technologies.split(", ") if technologies else [],
-                "summary": "Basic security review (fallback due to error)",
-                "recommendations": [
-                    "Validate all inputs",
-                    "Use parameterized queries for databases",
-                    "Implement proper authentication and authorization",
-                    "Log security events appropriately",
-                    "Handle errors securely without information disclosure",
-                ],
-                "prompt_injection": fallback_injection,
+    picked = _split_ids(components)
+    if not picked:
+        return json.dumps(
+            {
+                "success": True,
+                "review_type": "lightweight_pre_coding",
+                "status": "needs_components",
+                "task_description": task_description,
+                "instructions": (
+                    "Choose the components this change adds or directly modifies "
+                    "(usually 2 to 5), then call this tool again with the same "
+                    "task_description and components set to their ids "
+                    "(comma-separated). Parts of the app this change does not touch "
+                    "are out of scope, and components that always come with a pick "
+                    "are added for you. Add data_handled if the feature touches "
+                    "sensitive data."
+                ),
+                "components": library.menu(),
+                "data_handled_options": list(SENSITIVE_DATA_TYPES),
             },
-        }
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
 
-        return json.dumps(fallback_response, indent=2, ensure_ascii=False)
+    try:
+        result = library.resolve(picked, _split_ids(data_handled))
+    except UnknownComponentError as e:
+        return json.dumps(
+            {
+                "success": False,
+                "task_description": task_description,
+                "error": str(e),
+                "valid_components": e.valid,
+                "hint": "Use ids from the component menu (call without components).",
+            },
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+
+    implied = [c for c in result.components if c not in result.picked]
+    broad_hint = (
+        f"You picked {len(result.picked)} components. Most changes involve 2 to 5; "
+        "pick only what this change adds or modifies for a shorter, more relevant "
+        "result."
+        if len(result.picked) > MAX_TYPICAL_COMPONENTS
+        else None
+    )
+    shown_also = result.also_consider[:MAX_ALSO_CONSIDER]
+    response = {
+        "success": True,
+        "review_type": "lightweight_pre_coding",
+        "status": "complete",
+        "task_description": task_description,
+        "technologies": [t.strip() for t in technologies.split(",") if t.strip()],
+        "assessment": {
+            "risk_level": result.risk_level.value,
+            "components": result.picked,
+            "implied_components": implied,
+            "sensitive_data": result.sensitive_data,
+            "summary": (
+                f"{len(result.threats)} threats and "
+                f"{len(result.countermeasures)} countermeasures for "
+                f"{', '.join(result.picked)}. Risk level {result.risk_level.value} "
+                "(highest threat severity"
+                + (", raised for sensitive data" if result.sensitive_data else "")
+                + ")."
+            ),
+            "threats": [
+                {
+                    "id": t.id,
+                    "name": t.name,
+                    "severity": t.severity.value,
+                    "cwe": t.cwe,
+                }
+                for t in result.threats
+            ],
+            "countermeasures": [
+                {
+                    "id": m.id,
+                    "name": m.name,
+                    "how_to": m.how_to,
+                    "effort": m.effort.value,
+                    "asvs": m.asvs,
+                    "mitigates": result.mitigates[m.id],
+                }
+                for m in result.countermeasures
+            ],
+            "also_consider": [
+                {"id": t.id, "name": t.name, "severity": t.severity.value}
+                for t in shown_also
+            ],
+        },
+        "hint": broad_hint,
+        "instructions": (
+            "Build these countermeasures in as you write the code, starting with the "
+            "most severe threats. These threats come from the components you "
+            "picked. also_consider lists general threats from implied components; "
+            "pass those components explicitly for full detail. After writing code, "
+            "call general_verify_code_security."
+        ),
+        "metadata": {
+            "total_threats": len(result.threats),
+            "total_countermeasures": len(result.countermeasures),
+            "also_consider_total": len(result.also_consider),
+            "review_purpose": "lightweight_security_guidance",
+        },
+    }
+    return json.dumps(response, separators=(",", ":"), ensure_ascii=False)
 
 
 @general_mcp.tool(tags={"security", "verification", "code_review"})

@@ -1,0 +1,504 @@
+# Countermeasures: what a developer does about a threat.
+#   id        stable slug
+#   name      short imperative label
+#   how_to    one or two plain sentences
+#   effort    low | medium | high
+#   asvs      OWASP ASVS 5.0.0 requirement ids (format v5.0.0-<chapter>.<section>.<item>)
+#             that back this control; empty when ASVS has no matching requirement
+countermeasures:
+  # ---- Web and API -----------------------------------------------------------
+  - id: csrf-protection
+    name: Protect state-changing requests from cross-site forgery
+    how_to: Use SameSite cookies plus anti-forgery tokens, and only change state with POST, PUT, PATCH, or DELETE.
+    effort: low
+    asvs: [v5.0.0-3.5.1, v5.0.0-3.5.3, v5.0.0-3.3.2]
+
+  - id: strict-cors
+    name: Allow only the origins you trust
+    how_to: Return a fixed allow-list for Access-Control-Allow-Origin. Never reflect the request origin or use * with credentials.
+    effort: low
+    asvs: [v5.0.0-3.4.2, v5.0.0-3.5.2]
+
+  - id: rate-limiting
+    name: Rate-limit expensive or sensitive endpoints
+    how_to: Limit requests per user and per IP on login, reset, send, upload, and search endpoints, and return 429 when exceeded.
+    effort: medium
+    asvs: [v5.0.0-2.4.1]
+
+  - id: security-headers
+    name: Send the standard security headers
+    how_to: Set Strict-Transport-Security, Content-Security-Policy with frame-ancestors, X-Content-Type-Options nosniff, and a referrer policy.
+    effort: low
+    asvs: [v5.0.0-3.4.1, v5.0.0-3.4.3, v5.0.0-3.4.4, v5.0.0-3.4.5, v5.0.0-3.4.6]
+
+  - id: validate-redirect-targets
+    name: Redirect only to known destinations
+    how_to: Accept a short key or a relative path for post-login redirects and check it against an allow-list. Never redirect to a full URL from input.
+    effort: low
+    asvs: []
+
+  - id: allow-list-fields
+    name: Accept only the fields you expect
+    how_to: Bind requests to an explicit schema or DTO with allowed fields. Never copy a request body straight onto a model.
+    effort: low
+    asvs: [v5.0.0-15.3.3]
+
+  - id: return-minimal-fields
+    name: Return only the fields the client needs
+    how_to: Build response objects from an explicit list of fields instead of serializing whole database rows.
+    effort: low
+    asvs: [v5.0.0-15.3.1]
+
+  - id: server-side-validation
+    name: Validate all input on the server
+    how_to: Check type, length, range, and format for every input on the server. Client-side checks are only for convenience.
+    effort: low
+    asvs: [v5.0.0-2.2.1, v5.0.0-2.2.2]
+
+  - id: enforce-flow-order
+    name: Enforce step order and limits on the server
+    how_to: Store the state of multi-step flows on the server and reject steps that are out of order. Apply business limits there too.
+    effort: medium
+    asvs: [v5.0.0-2.3.1, v5.0.0-2.3.2]
+
+  # ---- Authentication and sessions -------------------------------------------
+  - id: login-attempt-limits
+    name: Slow down repeated login failures
+    how_to: Throttle or temporarily lock after repeated failures per account and per IP, without making lockout itself a denial-of-service tool.
+    effort: medium
+    asvs: [v5.0.0-6.3.1]
+
+  - id: breached-password-check
+    name: Reject known-breached passwords
+    how_to: Check new passwords against a breached-password list (for example the Pwned Passwords range API) at signup and change.
+    effort: low
+    asvs: [v5.0.0-6.2.4, v5.0.0-6.2.12]
+
+  - id: slow-password-hashing
+    name: Hash passwords with a slow, salted algorithm
+    how_to: Use Argon2id, scrypt, or bcrypt through your framework's password helper. Never use MD5 or SHA for passwords.
+    effort: low
+    asvs: [v5.0.0-11.4.2]
+
+  - id: sensible-password-rules
+    name: Use length-based password rules
+    how_to: Require a minimum length (15 or more is better), allow long passphrases and any characters, and skip composition rules.
+    effort: low
+    asvs: [v5.0.0-6.2.1, v5.0.0-6.2.5, v5.0.0-6.2.9]
+
+  - id: secure-reset-flow
+    name: Make password reset single-use and short-lived
+    how_to: Send a random single-use token that expires in minutes. Show the same response whether or not the account exists, and keep MFA in force.
+    effort: medium
+    asvs: [v5.0.0-6.4.1, v5.0.0-6.4.3]
+
+  - id: remove-default-accounts
+    name: Remove default and hardcoded accounts
+    how_to: Ship no preset admin users. Create the first admin through a one-time setup step with a strong generated password.
+    effort: low
+    asvs: [v5.0.0-6.3.2]
+
+  - id: offer-mfa
+    name: Offer or require a second factor
+    how_to: Support an authenticator app or passkeys, and require it for admins and sensitive actions.
+    effort: medium
+    asvs: [v5.0.0-6.3.3]
+
+  - id: new-session-on-login
+    name: Issue a fresh session at login
+    how_to: Create a new session id on every login and re-authentication, and discard the old one.
+    effort: low
+    asvs: [v5.0.0-7.2.4]
+
+  - id: crypto-random-tokens
+    name: Generate tokens with a cryptographic random source
+    how_to: Use secrets.token_urlsafe, crypto.randomBytes, or the framework default. Never use Math.random, time, or counters.
+    effort: low
+    asvs: [v5.0.0-7.2.3, v5.0.0-11.5.1]
+
+  - id: proper-logout-and-expiry
+    name: End sessions on the server
+    how_to: Invalidate server-side on logout, expiry, password change, and account removal. Do not rely on deleting the cookie client-side.
+    effort: medium
+    asvs: [v5.0.0-7.4.1, v5.0.0-7.4.2]
+
+  - id: secure-cookie-attributes
+    name: Set cookie security attributes
+    how_to: Use Secure, HttpOnly, and SameSite on session cookies, preferably with the __Host- prefix.
+    effort: low
+    asvs: [v5.0.0-3.3.1, v5.0.0-3.3.2, v5.0.0-3.3.4]
+
+  - id: verify-token-signature
+    name: Verify token signatures against an allow-list of algorithms
+    how_to: Verify every JWT signature, fix the accepted algorithms in code, and load keys from trusted configuration. Never accept alg none.
+    effort: low
+    asvs: [v5.0.0-9.1.1, v5.0.0-9.1.2, v5.0.0-9.1.3]
+
+  - id: validate-token-claims
+    name: Check expiry, audience, and issuer
+    how_to: Reject expired tokens and tokens whose audience or issuer does not match your service.
+    effort: low
+    asvs: [v5.0.0-9.2.1, v5.0.0-9.2.3]
+
+  - id: no-secrets-in-urls
+    name: Keep tokens and personal data out of URLs
+    how_to: Send tokens in headers or request bodies, never in query strings, which end up in logs and referrers.
+    effort: low
+    asvs: [v5.0.0-14.2.1]
+
+  - id: no-sensitive-data-in-browser-storage
+    name: Keep sensitive data out of browser storage
+    how_to: Prefer HttpOnly cookies for session tokens, and clear client-side data on logout.
+    effort: low
+    asvs: [v5.0.0-14.3.3, v5.0.0-14.3.1]
+
+  # ---- Authorization and data ------------------------------------------------
+  - id: check-permissions-server-side
+    name: Check permissions on the server for every action
+    how_to: Enforce role and permission checks in a central layer on each endpoint, not only by hiding UI.
+    effort: medium
+    asvs: [v5.0.0-8.2.1, v5.0.0-8.3.1]
+
+  - id: per-object-authorization
+    name: Check the user owns the object on every request
+    how_to: Look the object up by id AND owner, or check ownership explicitly, and return 404 when they do not match.
+    effort: medium
+    asvs: [v5.0.0-8.2.2, v5.0.0-8.3.1]
+
+  - id: scope-queries-to-tenant
+    name: Scope every query to the tenant
+    how_to: Apply the tenant filter in one place, such as a query helper or row-level security, so no query can forget it.
+    effort: medium
+    asvs: [v5.0.0-8.2.2]
+
+  - id: parameterized-queries
+    name: Use parameterized queries or an ORM
+    how_to: Pass user values as parameters. Never build SQL or query documents by joining strings.
+    effort: low
+    asvs: [v5.0.0-1.2.4]
+
+  - id: least-privilege-accounts
+    name: Give the app a least-privilege database account
+    how_to: Create a user limited to the tables and operations the app needs. Keep migrations on a separate admin account.
+    effort: medium
+    asvs: []
+
+  - id: encrypt-sensitive-data
+    name: Encrypt sensitive data at rest
+    how_to: Use AES-GCM or your cloud provider's managed encryption, with keys held outside the database.
+    effort: medium
+    asvs: [v5.0.0-11.3.2]
+
+  # ---- Files and storage -----------------------------------------------------
+  - id: upload-allow-list
+    name: Allow only the file types you need
+    how_to: Check the extension and the real file content against an allow-list. Ignore the client's Content-Type.
+    effort: low
+    asvs: [v5.0.0-5.2.2]
+
+  - id: upload-rename-and-isolate
+    name: Never use the user's filename or path
+    how_to: Generate your own filenames, store files outside the web root, and make sure uploads are never executed.
+    effort: low
+    asvs: [v5.0.0-5.3.1, v5.0.0-5.3.2]
+
+  - id: upload-size-limits
+    name: Limit file size and decompressed size
+    how_to: Set a maximum size per file, and cap decompressed size and file count for archives.
+    effort: low
+    asvs: [v5.0.0-5.2.1, v5.0.0-5.2.3]
+
+  - id: serve-uploads-safely
+    name: Serve uploads so browsers cannot run them
+    how_to: Send the correct Content-Type, Content-Disposition attachment for downloads, nosniff, and serve user files from a separate domain.
+    effort: low
+    asvs: [v5.0.0-4.1.1, v5.0.0-5.4.2, v5.0.0-3.2.1]
+
+  - id: private-storage-signed-urls
+    name: Keep storage private and hand out short-lived signed URLs
+    how_to: Block public access on the bucket and issue signed URLs that expire in minutes.
+    effort: low
+    asvs: []
+
+  - id: short-lived-scoped-credentials
+    name: Give clients short-lived, narrowly scoped credentials
+    how_to: Issue pre-signed or token-exchanged credentials limited to one object or prefix. Never ship long-lived keys to clients.
+    effort: medium
+    asvs: []
+
+  - id: safe-archive-extraction
+    name: Extract archives safely
+    how_to: Ignore paths inside archives, reject symlinks and entries that escape the target folder, and cap size and file count.
+    effort: medium
+    asvs: [v5.0.0-5.3.3, v5.0.0-5.2.3]
+
+  # ---- Outbound calls, webhooks, payments ------------------------------------
+  - id: ssrf-allow-list
+    name: Fetch only allow-listed destinations
+    how_to: Resolve the host, block private, loopback, and link-local ranges including cloud metadata, and prefer a fixed allow-list of hosts.
+    effort: medium
+    asvs: [v5.0.0-1.3.6, v5.0.0-13.2.4]
+
+  - id: no-redirect-following
+    name: Do not follow redirects on server-side fetches
+    how_to: Disable automatic redirects, or re-validate each hop against the same allow-list.
+    effort: low
+    asvs: [v5.0.0-15.3.2]
+
+  - id: validate-tls-certificates
+    name: Always verify TLS certificates
+    how_to: Never set verify=False or NODE_TLS_REJECT_UNAUTHORIZED=0. Add your private CA to the trust store if needed.
+    effort: low
+    asvs: [v5.0.0-12.3.2]
+
+  - id: timeouts-and-size-caps
+    name: Set timeouts and response size caps
+    how_to: Use connect and read timeouts and a maximum body size on every outbound call and queue consumer.
+    effort: low
+    asvs: [v5.0.0-15.2.2]
+
+  - id: verify-webhook-signature
+    name: Verify the webhook signature on the raw body
+    how_to: Check the provider's signature header with the shared secret before parsing, using a constant-time comparison.
+    effort: low
+    asvs: []
+
+  - id: reject-replayed-events
+    name: Reject old and repeated events
+    how_to: Check the event timestamp is recent and store processed event ids so repeats are ignored.
+    effort: low
+    asvs: []
+
+  - id: server-side-pricing
+    name: Compute prices and totals on the server
+    how_to: Take only item ids and quantities from the client, and look up prices, discounts, and totals from your own data.
+    effort: low
+    asvs: [v5.0.0-2.2.2, v5.0.0-2.3.2]
+
+  - id: idempotency-and-transactions
+    name: Make money-moving operations idempotent and transactional
+    how_to: Use idempotency keys and database transactions or locks so a retry or race cannot apply an operation twice.
+    effort: medium
+    asvs: [v5.0.0-2.3.3, v5.0.0-2.3.4]
+
+  - id: confirm-payment-server-side
+    name: Confirm payment status with the provider
+    how_to: Mark orders paid only from a verified webhook or a server-side API lookup, never from the browser redirect.
+    effort: low
+    asvs: []
+
+  - id: hosted-payment-fields
+    name: Use the provider's hosted card fields
+    how_to: Let the payment provider collect card data directly so card numbers never touch your servers or logs.
+    effort: low
+    asvs: []
+
+  # ---- Secrets and configuration ---------------------------------------------
+  - id: secrets-manager
+    name: Load secrets from a secrets manager or environment
+    how_to: Keep secrets out of code, images, and the repo. Use environment variables or a vault, scope access narrowly, and rotate anything that leaked.
+    effort: medium
+    asvs: [v5.0.0-13.3.1, v5.0.0-13.3.2]
+
+  - id: disable-debug-in-prod
+    name: Turn debug features off in production
+    how_to: Set DEBUG false, remove debug consoles and verbose logging, and fail the deploy if debug is on.
+    effort: low
+    asvs: [v5.0.0-13.4.2]
+
+  - id: no-vcs-or-env-files-deployed
+    name: Do not deploy repo metadata or env files
+    how_to: Exclude .git, .env, and backups from the build and the web root, and block them at the web server.
+    effort: low
+    asvs: [v5.0.0-13.4.1]
+
+  # ---- Frontend and content --------------------------------------------------
+  - id: output-encoding
+    name: Encode output for its context
+    how_to: Use your template engine's automatic escaping, and encode correctly for HTML, attributes, URLs, and JavaScript.
+    effort: low
+    asvs: [v5.0.0-1.2.1, v5.0.0-1.2.2, v5.0.0-1.2.3]
+
+  - id: sanitize-html
+    name: Sanitize user-provided HTML
+    how_to: Run user HTML through a maintained sanitizer such as DOMPurify or bleach with a strict allow-list. Prefer markdown or plain text.
+    effort: low
+    asvs: [v5.0.0-1.3.1]
+
+  - id: safe-dom-apis
+    name: Use safe DOM APIs
+    how_to: Use textContent or framework bindings instead of innerHTML, document.write, or dangerouslySetInnerHTML.
+    effort: low
+    asvs: [v5.0.0-3.2.2]
+
+  - id: subresource-integrity
+    name: Pin third-party scripts with integrity hashes
+    how_to: Add SRI hashes to external scripts and styles, or self-host them, and limit sources with a Content-Security-Policy.
+    effort: low
+    asvs: []
+
+  # ---- Jobs, parsing, commands, email ----------------------------------------
+  - id: validate-job-input
+    name: Validate job payloads like any other input
+    how_to: Check the schema of every queue message and drop or dead-letter anything that does not match.
+    effort: low
+    asvs: [v5.0.0-2.2.1]
+
+  - id: bounded-retries
+    name: Bound retries with backoff
+    how_to: Cap retry counts, use exponential backoff, and send failures to a dead-letter queue.
+    effort: low
+    asvs: [v5.0.0-15.2.2]
+
+  - id: avoid-unsafe-deserializers
+    name: Do not deserialize untrusted data with code-executing formats
+    how_to: Use JSON with schema validation. Avoid pickle, yaml.load, and native object serialization for untrusted input.
+    effort: low
+    asvs: [v5.0.0-1.5.2]
+
+  - id: disable-xml-external-entities
+    name: Turn off external entities in XML parsers
+    how_to: Use a hardened parser configuration such as defusedxml, with DTDs and external entities disabled.
+    effort: low
+    asvs: [v5.0.0-1.5.1]
+
+  - id: avoid-shell-and-eval
+    name: Avoid the shell and dynamic evaluation
+    how_to: Call programs with an argument list and no shell, validate arguments against an allow-list, and never eval or build templates from input.
+    effort: low
+    asvs: [v5.0.0-1.2.5, v5.0.0-1.3.2, v5.0.0-1.3.7]
+
+  - id: sanitize-mail-input
+    name: Strip line breaks from mail headers
+    how_to: Reject CR and LF in subject, address, and header values, and use your mail library's structured API.
+    effort: low
+    asvs: [v5.0.0-1.3.11]
+
+  - id: fixed-base-url-for-links
+    name: Build links from a configured base URL
+    how_to: Take the public base URL from configuration, not from the Host or X-Forwarded headers of the request.
+    effort: low
+    asvs: [v5.0.0-4.1.3]
+
+  # ---- Dependencies and infrastructure ---------------------------------------
+  - id: verify-packages-exist
+    name: Check every new package exists and is the one you meant
+    how_to: Confirm the name, age, and publisher on the registry before installing, and watch for lookalike names.
+    effort: low
+    asvs: []
+
+  - id: scan-and-update-dependencies
+    name: Scan dependencies and update vulnerable ones
+    how_to: Scan lockfiles for known vulnerabilities, fix reachable ones first, and keep updates on a regular schedule.
+    effort: low
+    asvs: [v5.0.0-15.2.1]
+
+  - id: pin-and-lock-dependencies
+    name: Pin versions and commit lockfiles
+    how_to: Commit a lockfile, install with the frozen or locked option in CI, and review dependency changes in pull requests.
+    effort: low
+    asvs: [v5.0.0-15.2.1]
+
+  - id: non-root-minimal-images
+    name: Run containers as non-root on minimal images
+    how_to: Set a non-root USER, use a slim or distroless base image, and drop extra capabilities.
+    effort: low
+    asvs: [v5.0.0-15.2.3]
+
+  - id: least-privilege-iam
+    name: Grant only the cloud permissions the app uses
+    how_to: Write narrow roles per service, avoid wildcards on actions and resources, and review them when features change.
+    effort: medium
+    asvs: []
+
+  - id: private-network-for-data-stores
+    name: Keep data stores off the public internet
+    how_to: Place databases and caches in private subnets, bind them to internal interfaces, and allow only the app through security groups.
+    effort: low
+    asvs: []
+
+  # ---- Logging and errors ----------------------------------------------------
+  - id: generic-error-messages
+    name: Return generic errors to users
+    how_to: Show a short message and a request id, log the details server-side, and use the same wording for unknown and wrong credentials.
+    effort: low
+    asvs: [v5.0.0-16.5.1]
+
+  - id: log-without-secrets
+    name: Keep secrets and personal data out of logs
+    how_to: Mask tokens, passwords, card numbers, and personal fields before logging, and avoid logging whole request bodies.
+    effort: low
+    asvs: [v5.0.0-16.2.5]
+
+  - id: log-security-events
+    name: Log security-relevant events
+    how_to: Log logins, failures, permission denials, and admin actions with time, user, and source, and alert on spikes.
+    effort: medium
+    asvs: [v5.0.0-16.3.1, v5.0.0-16.3.2]
+
+  # ---- LLMs and agents -------------------------------------------------------
+  - id: treat-model-input-as-untrusted
+    name: Treat text from users, files, and tools as untrusted
+    how_to: Keep instructions and data separate, label untrusted content clearly, and never let it grant new permissions.
+    effort: medium
+    asvs: []
+
+  - id: validate-model-output
+    name: Validate model output before using it
+    how_to: Parse output against a schema, escape it for its destination, and never run it directly as SQL, shell, or HTML.
+    effort: medium
+    asvs: []
+
+  - id: minimize-data-sent-to-model
+    name: Send the model only what it needs
+    how_to: Strip secrets and personal data from prompts, and check the provider's retention and training terms.
+    effort: low
+    asvs: [v5.0.0-14.2.3]
+
+  - id: token-budgets
+    name: Cap tokens, steps, and spend per user
+    how_to: Set maximum prompt size, tool-call steps, and daily spend, and stop runaway loops.
+    effort: low
+    asvs: []
+
+  - id: least-privilege-agent-tools
+    name: Give agents only the tools and scope they need
+    how_to: Expose read-only tools by default, limit file and network scope, and run tools in a sandbox or a separate account.
+    effort: medium
+    asvs: []
+
+  - id: human-approval-for-risky-actions
+    name: Ask a person before risky actions
+    how_to: Require confirmation for deletes, payments, outbound messages, shell commands, and anything that changes permissions.
+    effort: low
+    asvs: []
+
+  - id: restrict-agent-outbound
+    name: Limit where agent tools can send data
+    how_to: Allow-list outbound domains and block tools that post to arbitrary URLs, email, or chat without review.
+    effort: medium
+    asvs: []
+
+  - id: pin-and-review-mcp-servers
+    name: Pin and review MCP servers
+    how_to: Pin server versions (no npx -y without a version), prefer official sources, read what tools they expose, and give each only what it needs.
+    effort: low
+    asvs: []
+
+  - id: review-agent-extensions
+    name: Review skills, plugins, and hooks before installing
+    how_to: Read the files, check the source and maintainer, and look for hidden text, network calls, and commands that run on their own.
+    effort: low
+    asvs: []
+
+  - id: narrow-agent-permission-rules
+    name: Use narrow permission rules
+    how_to: Allow specific commands such as npm test instead of wildcards, and avoid bypass modes.
+    effort: low
+    asvs: []
+
+  - id: keep-secrets-out-of-agent-reach
+    name: Keep secrets out of the agent's reach
+    how_to: Deny reads of .env files, SSH keys, and cloud credentials in the agent's permission rules, and use scoped short-lived credentials.
+    effort: low
+    asvs: []

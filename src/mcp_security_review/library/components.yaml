@@ -1,0 +1,102 @@
+# Components: the building blocks a feature is made of.
+# The agent picks the ones that apply; threats attach to components.
+#   id          stable slug, never renamed or reused
+#   name        short label shown in the menu
+#   applies_when  one line the agent reads to decide if it applies
+#   implies     (optional) components that always come with this one
+components:
+  - id: web-endpoint
+    name: Web or API endpoint
+    applies_when: The feature adds or changes an HTTP route, API, or form handler.
+
+  - id: authentication
+    name: Login and account management
+    applies_when: Users sign up, log in, reset passwords, or use MFA.
+    implies: [web-endpoint]
+
+  - id: session-management
+    name: Sessions and tokens
+    applies_when: The app keeps users logged in with cookies, session ids, or JWTs.
+
+  - id: authorization
+    name: Permissions and data access
+    applies_when: Different users, roles, or tenants must see or change different data.
+
+  - id: database
+    name: Database
+    applies_when: The feature reads or writes SQL or NoSQL data.
+
+  - id: file-upload
+    name: File upload
+    applies_when: Users send files to the app (avatars, attachments, CSV imports).
+    implies: [web-endpoint]
+
+  - id: object-storage
+    name: Object or file storage
+    applies_when: Files or blobs are stored in S3, GCS, Azure Blob, or on disk.
+
+  - id: outbound-http-request
+    name: Outbound HTTP calls
+    applies_when: The server fetches URLs or calls other services, especially with user-supplied addresses.
+
+  - id: third-party-webhook
+    name: Incoming webhooks
+    applies_when: An external service (Stripe, GitHub, Slack) sends events to an endpoint of yours.
+    implies: [web-endpoint]
+
+  - id: payment-flow
+    name: Payments and orders
+    applies_when: The feature handles prices, checkout, subscriptions, refunds, or balances.
+    implies: [web-endpoint]
+
+  - id: secrets-and-config
+    name: Secrets and configuration
+    applies_when: The feature uses API keys, passwords, tokens, environment variables, or config files.
+
+  - id: user-generated-content
+    name: User-generated content
+    applies_when: The app stores or shows text, HTML, markdown, or images that users wrote or supplied.
+
+  - id: browser-frontend
+    name: Browser frontend
+    applies_when: JavaScript runs in the browser, handles tokens or user data, or loads third-party scripts.
+
+  - id: background-job
+    name: Background jobs and queues
+    applies_when: Work runs in workers, cron jobs, or queues outside the request.
+
+  - id: serialization-and-parsing
+    name: Parsing and deserialization
+    applies_when: The app parses XML, YAML, pickle, archives, or other structured input from outside.
+
+  - id: shell-and-dynamic-code
+    name: OS commands and dynamic code
+    applies_when: The app runs shell commands, subprocesses, eval, or builds templates from input.
+
+  - id: email-sending
+    name: Email and notifications
+    applies_when: The app sends email, SMS, or push messages, or builds links for them.
+
+  - id: dependencies
+    name: Packages and dependencies
+    applies_when: New libraries are added or updated (pip, npm, and so on).
+
+  - id: container-and-iac
+    name: Containers and infrastructure code
+    applies_when: Dockerfiles, Kubernetes, Terraform, or cloud permissions are written or changed.
+
+  - id: logging-and-errors
+    name: Logging and error handling
+    applies_when: The feature logs data or shows or returns error messages.
+
+  - id: llm-integration
+    name: LLM calls
+    applies_when: The app sends user or document content to a language model and uses the reply.
+
+  - id: agent-tools
+    name: AI agent with tools
+    applies_when: An AI agent can run commands, read files, browse, or call tools or MCP servers.
+
+  - id: coding-agent-setup
+    name: Coding agent configuration
+    applies_when: MCP servers, hooks, skills, plugins, or permission rules for a coding agent are added or changed.

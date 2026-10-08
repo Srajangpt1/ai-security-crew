@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — threat library replaces the OWASP guideline files
+- `lightweight_security_review` now takes two calls: the first returns a menu of components (file upload, database, login, and so on); the second takes `components` (and optionally `data_handled`) and returns the threats to guard against and the countermeasures to build in. The calling agent picks the components, so there is no keyword matching
+- New built-in threat library in `src/mcp_security_review/library/`: 23 components, 83 threats (STRIDE, CWE), and 81 countermeasures that cite OWASP ASVS 5.0.0 requirement ids
+- The risk level is the highest severity among the threats on the picked components; `data_handled` raises it one step. Threats that only come from implied components are listed separately under `also_consider`
+- Teams can add or override components, threats, and countermeasures in `.ai-security-crew/library/*.yaml` (see `docs/ADDING_THREATS.md`)
+- Tool parameters `include_guidelines` and `include_prompt_injection` are removed; `project_root` and `components` were added. Output is compact JSON, about 50-75% smaller on the example tasks
+- Removed the 101 bundled OWASP cheat sheet files (about 2.3 MB), the guideline loader, `SecurityAssessment`, and the guideline scripts and docs. Added the `pyyaml` dependency
+- The threat model tool still uses the keyword analyzer for its `security_signals`
+
 ### Removed — Jira and Confluence integration
 - Removed the Jira and Confluence tools (`jira_get_issue`, `jira_assess_ticket_security`, `confluence_search`, `confluence_get_page`) and `threatmodel_search_previous_threat_models`, plus the `atlassian` extra, OAuth setup, Jira/Confluence CLI flags and environment variables
 - Removed `providers/atlassian/`, `models/atlassian/`, `preprocessing/` and the Atlassian-only helpers in `utils/`; the `cachetools` dependency is gone too
