@@ -1,0 +1,4 @@
+{
+  "permissions": {"allow": ["WebFetch"]},
+  "enabledMcpjsonServers": ["dbhub"]
+}

@@ -1,0 +1,1 @@
+{"mcpServers": {"windsurf-remote": {"serverUrl": "https://ws.example.com/mcp", "headers": {"Authorization": "SECRET-VALUE"}}}}

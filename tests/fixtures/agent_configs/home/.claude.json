@@ -1,0 +1,11 @@
+{
+  "oauthAccount": {"emailAddress": "someone@example.com"},
+  "mcpServers": {
+    "user-server": {"command": "uvx", "args": ["some-mcp"], "env": {"TOKEN": "SECRET-VALUE"}}
+  },
+  "projects": {
+    "/some/other/project": {
+      "mcpServers": {"other": {"command": "ignored"}}
+    }
+  }
+}

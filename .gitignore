@@ -79,3 +79,7 @@ skills-workspace/
 # Claude (ignore personal settings, track shared commands/skills)
 .claude/settings.local.json
 .claude/settings.json
+
+# Agent config fixtures use the same dot-dirs as real configs
+!tests/fixtures/agent_configs/**/.vscode/
+!tests/fixtures/agent_configs/**/.cursor/

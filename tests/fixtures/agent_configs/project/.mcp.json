@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "dbhub": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bytebase/dbhub"],
+      "env": {"DATABASE_URL": "SECRET-VALUE"}
+    },
+    "remote/api": {
+      "type": "streamable-http",
+      "url": "https://mcp.example.com/mcp",
+      "headers": {"Authorization": "Bearer SECRET-VALUE"}
+    }
+  }
+}
