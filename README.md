@@ -103,10 +103,7 @@ Add to your MCP config (Claude Desktop, Cursor, etc.):
       "args": [
         "run", "--rm", "-i",
         "mcp-security-review:latest"
-      ],
-      "env": {
-        "PATH": "/usr/local/bin:/usr/bin:/bin"
-      }
+      ]
     }
   }
 }
