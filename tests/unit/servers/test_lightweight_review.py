@@ -71,6 +71,18 @@ async def test_implied_threats_are_secondary_and_capped() -> None:
 
 
 @pytest.mark.anyio
+async def test_agent_threats_carry_mcp_top10_ids_and_others_do_not() -> None:
+    data = await call(task_description="Add an AI agent", components="llm-integration")
+    threats = {t["id"]: t for t in data["assessment"]["threats"]}
+
+    assert threats["prompt-injection"]["mcp_top10"] == ["MCP06:2025"]
+
+    data = await call(task_description="Query", components="database")
+    sql = next(t for t in data["assessment"]["threats"] if t["id"] == "sql-injection")
+    assert "mcp_top10" not in sql
+
+
+@pytest.mark.anyio
 async def test_menu_tells_the_agent_to_pick_only_what_changes() -> None:
     data = await call(task_description="Add avatar upload")
 
