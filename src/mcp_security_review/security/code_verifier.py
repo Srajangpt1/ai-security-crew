@@ -1,9 +1,9 @@
 """Code security review context builder for AI-powered analysis.
 
-This module prepares security context and review prompts for the AI agent
-to perform security analysis on generated code. The focus areas and checklist
-come from the threat library for the components the agent names, plus a short
-baseline. Nothing scans the code to guess what it does.
+This module prepares the checklist and review prompt the AI agent uses to review
+code it already has in context. The focus areas and checklist come from the threat
+library for the components the agent names, plus a short baseline. The code itself
+is never passed in, scanned, or returned.
 """
 
 from dataclasses import dataclass, field
@@ -18,7 +18,6 @@ MAX_COMPONENT_CHECKS = 15
 class SecurityReviewContext:
     """Context for AI-powered security review."""
 
-    code: str
     file_path: str | None
     components: list[str] = field(default_factory=list)
     risk_level: str | None = None
@@ -35,7 +34,6 @@ class CodeReviewContextBuilder:
 
     def build_review_context(
         self,
-        code: str,
         file_path: str | None = None,
         components: list[str] | None = None,
         data_handled: list[str] | None = None,
@@ -43,7 +41,6 @@ class CodeReviewContextBuilder:
         """Build context for AI security review.
 
         Args:
-            code: The source code to review.
             file_path: Optional file path, shown in the review prompt.
             components: Library component ids the code implements, as chosen in
                 the pre-coding review. Targets the checklist at their threats.
@@ -78,7 +75,6 @@ class CodeReviewContextBuilder:
         checklist = _unique(checklist)
 
         review_prompt = self._build_review_prompt(
-            code=code,
             file_path=file_path,
             components=picked,
             risk_level=risk_level,
@@ -87,7 +83,6 @@ class CodeReviewContextBuilder:
         )
 
         return SecurityReviewContext(
-            code=code,
             file_path=file_path,
             components=picked,
             risk_level=risk_level,
@@ -98,7 +93,6 @@ class CodeReviewContextBuilder:
 
     def _build_review_prompt(
         self,
-        code: str,
         file_path: str | None,
         components: list[str],
         risk_level: str | None,
@@ -125,7 +119,8 @@ class CodeReviewContextBuilder:
         prompt_parts.append("### Review Instructions")
         prompt_parts.append("")
         prompt_parts.append(
-            "Analyze the code below for security vulnerabilities. For each issue found:"
+            "Review the code you just wrote (it is already in your context) for "
+            "security vulnerabilities. For each issue found:"
         )
         prompt_parts.append(
             "1. Identify the vulnerability type and severity (Critical/High/Medium/Low)"
@@ -150,14 +145,6 @@ class CodeReviewContextBuilder:
         prompt_parts.append("Verify each item and report violations:")
         for item in checklist:
             prompt_parts.append(f"- [ ] {item}")
-        prompt_parts.append("")
-
-        # Code to review
-        prompt_parts.append("### Code to Review")
-        prompt_parts.append("")
-        prompt_parts.append("```")
-        prompt_parts.append(code)
-        prompt_parts.append("```")
         prompt_parts.append("")
 
         # Expected output format

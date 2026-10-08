@@ -192,8 +192,15 @@ async def verify_code_security(
     ctx: Context,
     code: Annotated[
         str,
-        Field(description="The source code to review for security vulnerabilities."),
-    ],
+        Field(
+            description=(
+                "Deprecated and ignored. Do not paste code here: the checklist "
+                "depends only on the components, and you review the code already "
+                "in your context."
+            ),
+            default="",
+        ),
+    ] = "",
     file_path: Annotated[
         str,
         Field(
@@ -233,27 +240,22 @@ async def verify_code_security(
         ),
     ] = "",
 ) -> str:
-    """Request an AI-powered security review of generated code.
+    """Get the security checklist to review code you just wrote.
 
-    This tool prepares a comprehensive security review context and returns
-    structured guidance for you (the AI agent) to analyze the code for
-    security vulnerabilities.
-
-    YOU (the AI) will perform the actual security analysis using:
-    - The security checklist provided
-    - The focus areas for the components you name
-    - Your knowledge of security best practices
+    This tool returns a checklist and focus areas for the components you name.
+    It does not receive or return your code: YOU (the AI agent) review the
+    code already in your context against the checklist.
 
     Recommended workflow:
     1. Run lightweight_security_review BEFORE coding and note the components
     2. Generate code following the countermeasures it returns
-    3. Call this tool with the generated code and the same components
-    4. Analyze the code following the review_prompt instructions
+    3. Call this tool with the same components (no code needed)
+    4. Review the code you wrote against the checklist and focus areas
     5. Report findings and provide secure code fixes
 
     Args:
         ctx: The FastMCP context.
-        code: The source code to review.
+        code: Deprecated and ignored; leave empty.
         file_path: Optional file path, shown in the review.
         components: Component ids the code implements (from the pre-coding review).
         data_handled: Kinds of sensitive data involved (optional).
@@ -261,39 +263,36 @@ async def verify_code_security(
 
     Returns:
         JSON containing:
-        - review_prompt: Detailed instructions for performing the security review
+        - review_prompt: Instructions for performing the security review
         - security_checklist: Items to verify in the code
         - focus_areas: Specific vulnerability types to look for
         - context: file path, components, and risk level
-        - code: The code to review (for reference)
 
-    After receiving this response, analyze the code and provide:
+    After receiving this response, review your code and provide:
     1. Security assessment (Secure/Needs Attention/Insecure)
     2. List of vulnerabilities found with severity
     3. Specific code fixes for each issue
     4. Checklist results
 
     Example:
-        verify_code_security(code="def login(): ...", file_path="auth.py",
-                             components="authentication")
+        verify_code_security(file_path="auth.py", components="authentication")
     """
     try:
         library = load_library(
             Path(project_root).expanduser() if project_root else None
         )
     except LibraryError as e:
-        return library_error(e, {"code_to_review": code})
+        return library_error(e, {})
 
     try:
         context_builder = CodeReviewContextBuilder(library)
         review_context = context_builder.build_review_context(
-            code=code,
             file_path=file_path if file_path else None,
             components=split_ids(components) or None,
             data_handled=split_ids(data_handled) or None,
         )
     except UnknownComponentError as e:
-        return unknown_component_error(e, {"code_to_review": code})
+        return unknown_component_error(e, {})
 
     try:
         # Build response with all context needed for AI review
@@ -302,8 +301,10 @@ async def verify_code_security(
             "review_type": "ai_powered_security_review",
             "instructions": (
                 "IMPORTANT: You (the AI agent) must now perform the security "
-                "review. Analyze the code using the checklist and focus areas. "
-                "Report all security issues found with severity ratings and fixes."
+                "review. The code is not included here: review the code you just "
+                "wrote, which is already in your context, using the checklist and "
+                "focus areas. Report all security issues found with severity "
+                "ratings and fixes."
             ),
             "review_prompt": review_context.review_prompt,
             "context": {
@@ -313,7 +314,6 @@ async def verify_code_security(
             },
             "security_checklist": review_context.security_checklist,
             "focus_areas": review_context.review_focus_areas,
-            "code_to_review": code,
             "expected_response": {
                 "format": "structured_security_review",
                 "required_sections": [
@@ -356,7 +356,6 @@ async def verify_code_security(
                 "Proper error handling without information disclosure",
                 "Secure cryptographic practices (no MD5, SHA1 for security)",
             ],
-            "code_to_review": code,
             "expected_response": {
                 "format": "structured_security_review",
                 "required_sections": [
