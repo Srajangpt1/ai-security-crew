@@ -5,25 +5,16 @@ description = "Security for vibe coders and their coding agents: an MCP server t
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "atlassian-python-api>=4.0.0",
-    "requests[socks]>=2.31.0",
-    "beautifulsoup4>=4.12.3",
     "httpx>=0.28.0",
     "mcp>=1.8.0,<2.0.0",
     "fastmcp>=2.3.4,<2.4.0",
     "python-dotenv>=1.0.1",
-    "markdownify>=0.11.6",
-    "markdown>=3.7.0",
-    "markdown-to-confluence>=0.3.0,<0.4.0",
     "pydantic>=2.10.6",
     "trio>=0.29.0",
     "click>=8.1.7",
     "uvicorn>=0.27.1",
     "starlette>=0.37.1",
     "thefuzz>=0.22.1",
-    "python-dateutil>=2.9.0.post0",
-    "types-python-dateutil>=2.9.0.20241206",
-    "keyring>=25.6.0",
     "cachetools>=5.0.0",
     "types-cachetools>=5.5.0.20240820",
 ]
@@ -33,6 +24,19 @@ name = "Srajan Gupta"
 [build-system]
 requires = ["hatchling", "uv-dynamic-versioning>=0.7.0"]
 build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+atlassian = [
+    "atlassian-python-api>=4.0.0",
+    "requests[socks]>=2.31.0",
+    "beautifulsoup4>=4.12.3",
+    "markdownify>=0.11.6",
+    "markdown>=3.7.0",
+    "markdown-to-confluence>=0.3.0,<0.4.0",
+    "python-dateutil>=2.9.0.post0",
+    "types-python-dateutil>=2.9.0.20241206",
+    "keyring>=25.6.0",
+]
 
 [project.scripts]
 mcp-security-review = "mcp_security_review:main"

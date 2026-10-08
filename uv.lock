@@ -766,27 +766,31 @@ cli = [
 name = "mcp-security-review"
 source = { editable = "." }
 dependencies = [
-    { name = "atlassian-python-api" },
-    { name = "beautifulsoup4" },
     { name = "cachetools" },
     { name = "click" },
     { name = "fastmcp" },
     { name = "httpx" },
-    { name = "keyring" },
-    { name = "markdown" },
-    { name = "markdown-to-confluence" },
-    { name = "markdownify" },
     { name = "mcp" },
     { name = "pydantic" },
-    { name = "python-dateutil" },
     { name = "python-dotenv" },
-    { name = "requests", extra = ["socks"] },
     { name = "starlette" },
     { name = "thefuzz" },
     { name = "trio" },
     { name = "types-cachetools" },
-    { name = "types-python-dateutil" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+atlassian = [
+    { name = "atlassian-python-api" },
+    { name = "beautifulsoup4" },
+    { name = "keyring" },
+    { name = "markdown" },
+    { name = "markdown-to-confluence" },
+    { name = "markdownify" },
+    { name = "python-dateutil" },
+    { name = "requests", extra = ["socks"] },
+    { name = "types-python-dateutil" },
 ]
 
 [package.dev-dependencies]
@@ -804,28 +808,29 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "atlassian-python-api", specifier = ">=4.0.0" },
-    { name = "beautifulsoup4", specifier = ">=4.12.3" },
+    { name = "atlassian-python-api", marker = "extra == 'atlassian'", specifier = ">=4.0.0" },
+    { name = "beautifulsoup4", marker = "extra == 'atlassian'", specifier = ">=4.12.3" },
     { name = "cachetools", specifier = ">=5.0.0" },
     { name = "click", specifier = ">=8.1.7" },
     { name = "fastmcp", specifier = ">=2.3.4,<2.4.0" },
     { name = "httpx", specifier = ">=0.28.0" },
-    { name = "keyring", specifier = ">=25.6.0" },
-    { name = "markdown", specifier = ">=3.7.0" },
-    { name = "markdown-to-confluence", specifier = ">=0.3.0,<0.4.0" },
-    { name = "markdownify", specifier = ">=0.11.6" },
+    { name = "keyring", marker = "extra == 'atlassian'", specifier = ">=25.6.0" },
+    { name = "markdown", marker = "extra == 'atlassian'", specifier = ">=3.7.0" },
+    { name = "markdown-to-confluence", marker = "extra == 'atlassian'", specifier = ">=0.3.0,<0.4.0" },
+    { name = "markdownify", marker = "extra == 'atlassian'", specifier = ">=0.11.6" },
     { name = "mcp", specifier = ">=1.8.0,<2.0.0" },
     { name = "pydantic", specifier = ">=2.10.6" },
-    { name = "python-dateutil", specifier = ">=2.9.0.post0" },
+    { name = "python-dateutil", marker = "extra == 'atlassian'", specifier = ">=2.9.0.post0" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
-    { name = "requests", extras = ["socks"], specifier = ">=2.31.0" },
+    { name = "requests", extras = ["socks"], marker = "extra == 'atlassian'", specifier = ">=2.31.0" },
     { name = "starlette", specifier = ">=0.37.1" },
     { name = "thefuzz", specifier = ">=0.22.1" },
     { name = "trio", specifier = ">=0.29.0" },
     { name = "types-cachetools", specifier = ">=5.5.0.20240820" },
-    { name = "types-python-dateutil", specifier = ">=2.9.0.20241206" },
+    { name = "types-python-dateutil", marker = "extra == 'atlassian'", specifier = ">=2.9.0.20241206" },
     { name = "uvicorn", specifier = ">=0.27.1" },
 ]
+provides-extras = ["atlassian"]
 
 [package.metadata.requires-dev]
 dev = [

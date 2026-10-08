@@ -19,7 +19,7 @@ from mcp_security_review.models.constants import (
     UNASSIGNED,
     UNKNOWN,
 )
-from mcp_security_review.utils import parse_date
+from mcp_security_review.utils.date import parse_date
 
 logger = logging.getLogger(__name__)
 

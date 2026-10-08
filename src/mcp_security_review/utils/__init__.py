@@ -1,9 +1,10 @@
-"""
-Utility functions for the MCP Atlassian integration.
-This package provides various utility functions used throughout the codebase.
+"""Shared utilities.
+
+Only dependency-light helpers are re-exported here so the core package imports
+without the optional Atlassian extra. Atlassian-specific helpers (``date``,
+``oauth``, ``ssl``, ``urls``, ``decorators``) are imported from their modules.
 """
 
-from .date import parse_date
 from .io import is_read_only_mode
 
 # Export lifecycle utilities
@@ -13,22 +14,9 @@ from .lifecycle import (
 )
 from .logging import setup_logging
 
-# Export OAuth utilities
-from .oauth import OAuthConfig, configure_oauth_session
-from .ssl import SSLIgnoreAdapter, configure_ssl_verification
-from .urls import is_atlassian_cloud_url
-
-# Export all utility functions for backward compatibility
 __all__ = [
-    "SSLIgnoreAdapter",
-    "configure_ssl_verification",
-    "is_atlassian_cloud_url",
     "is_read_only_mode",
     "setup_logging",
-    "parse_date",
-    "parse_iso8601_date",
-    "OAuthConfig",
-    "configure_oauth_session",
     "setup_signal_handlers",
     "ensure_clean_exit",
 ]

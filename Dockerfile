@@ -15,7 +15,7 @@ ADD . /app
 
 # Install the project and its dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --no-dev
+    uv sync --no-dev --extra atlassian
 
 # Remove unnecessary files from the virtual environment before copying
 RUN find /app/.venv -name '__pycache__' -type d -exec rm -rf {} + && \

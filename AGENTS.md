@@ -26,26 +26,26 @@ This file provides guidance for autonomous coding agents working inside the **AI
 > **Note**: This workflow is also delivered to end users automatically via the MCP server's `instructions` field on connect. Changes here should stay in sync with `servers/main.py`.
 
 ### Before starting any coding task
-- Call `lightweight_security_review` with the task description and tech stack.
-- If working from a Jira ticket, call `assess_ticket_security` instead.
-- For significant new features (auth, file handling, external integrations), also call `perform_threat_model`.
+- Call `general_lightweight_security_review` with the task description and tech stack.
+- If working from a Jira ticket and `jira_assess_ticket_security` is available (needs the `atlassian` extra), call it instead.
+- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.
 
 ### When adding or updating packages
 Run both steps before writing code that uses the new packages:
 
-1. **Verify packages exist** — call `verify_packages`. Fix any invalid packages before proceeding.
-2. **Scan for vulnerabilities** — call `scan_dependencies` in parallel with `verify_code_security`, passing the packages and code snippets where they are used. Act on results:
+1. **Verify packages exist** — call `sca_verify_packages`. Fix any invalid packages before proceeding.
+2. **Scan for vulnerabilities** — call `sca_scan_dependencies` in parallel with `general_verify_code_security`, passing the packages and code snippets where they are used. Act on results:
    - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing
    - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway
 
 Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects (`"pypi"` or `"npm"`).
 
 ### After generating code
-- Call `verify_code_security` with the generated code. Follow the `review_prompt` in the response to perform the analysis and report findings.
+- Call `general_verify_code_security` with the generated code. Follow the `review_prompt` in the response to perform the analysis and report findings.
 
 ### Persisting threat models
-- After `perform_threat_model`, call `update_threat_model_file` to write `threat-model.md`.
-- Call `search_previous_threat_models` first to avoid duplicating existing models.
+- After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.
+- If Confluence tools are available (needs the `atlassian` extra), call `threatmodel_search_previous_threat_models` first to avoid duplicating existing models.
 
 ---
 
