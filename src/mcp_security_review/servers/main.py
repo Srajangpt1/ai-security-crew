@@ -381,28 +381,66 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
         return response
 
 
-_AGENT_INSTRUCTIONS = (
-    "# Security Review MCP — Agent Workflow\n\n"
-    "Follow this workflow whenever you write or modify code.\n\n"
-    "## 1. Before you start coding\n"
-    "Call `lightweight_security_review` with a description of what you're building and the tech stack.\n"  # noqa: E501
-    "- Use this for any non-trivial coding task to identify risks and get security guidelines upfront.\n"  # noqa: E501
-    "- If working from a Jira ticket, call `assess_ticket_security` instead.\n"
-    "- For significant new features (auth, file handling, external integrations), also call `perform_threat_model`.\n\n"  # noqa: E501
-    "## 2. When adding or updating dependencies\n"
-    "Run both steps before writing any code that uses the new packages:\n"
-    "1. Call `verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
-    "2. Call `scan_dependencies` in parallel with step 3 — scans for CVEs and checks reachability. Act on results:\n"  # noqa: E501
-    "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
-    "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
-    "## 3. After generating code\n"
-    "Call `verify_code_security` with the generated code.\n"
-    "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
-    "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
-    "## 4. Persisting threat models (optional)\n"
-    "After `perform_threat_model`, call `update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
-    "Call `search_previous_threat_models` first to avoid duplicating existing models.\n"
-)
+def build_agent_instructions(atlassian: bool) -> str:
+    """Build the workflow text sent to MCP clients on connect.
+
+    Args:
+        atlassian: Whether the optional Atlassian extra is installed. When false,
+            Jira and Confluence tools are not mentioned.
+
+    Returns:
+        The agent workflow instructions.
+    """
+    jira_line = (
+        "- If working from a Jira ticket and `jira_assess_ticket_security` is "
+        "available, call it instead.\n"
+        if atlassian
+        else ""
+    )
+    confluence_line = (
+        "If `confluence_search` is available, call "
+        "`threatmodel_search_previous_threat_models` first to avoid duplicating "
+        "existing models.\n"
+        if atlassian
+        else ""
+    )
+    return (
+        "# Security Review MCP — Agent Workflow\n\n"
+        "Follow this workflow whenever you write or modify code.\n\n"
+        "## 1. Before you start coding\n"
+        "Call `general_lightweight_security_review` with a description of what you're building and the tech stack.\n"  # noqa: E501
+        "- Use this for any non-trivial coding task to identify risks and get security guidelines upfront.\n"  # noqa: E501
+        + jira_line
+        + "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.\n\n"  # noqa: E501
+        "## 2. When adding or updating dependencies\n"
+        "Run both steps before writing any code that uses the new packages:\n"
+        "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
+        "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs and checks reachability. Act on results:\n"  # noqa: E501
+        "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
+        "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
+        "## 3. After generating code\n"
+        "Call `general_verify_code_security` with the generated code.\n"
+        "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
+        "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
+        "## 4. Persisting threat models (optional)\n"
+        "After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
+         + confluence_line
+    )
+
+
+try:
+    from .confluence import confluence_mcp
+    from .jira import jira_mcp
+
+    _ATLASSIAN_INSTALLED = True
+except ImportError:
+    _ATLASSIAN_INSTALLED = False
+    logger.info(
+        "Atlassian extra not installed; Jira and Confluence tools are disabled. "
+        "Install with: pip install 'mcp-security-review[atlassian]'"
+    )
+
+_AGENT_INSTRUCTIONS = build_agent_instructions(_ATLASSIAN_INSTALLED)
 
 main_mcp = SecurityReviewMCP(
     name="Security Review MCP",
@@ -413,15 +451,7 @@ main_mcp.mount("general", general_mcp)
 main_mcp.mount("threatmodel", threat_model_mcp)
 main_mcp.mount("sca", sca_mcp)
 
-try:
-    from .confluence import confluence_mcp
-    from .jira import jira_mcp
-except ImportError:
-    logger.info(
-        "Atlassian extra not installed; Jira and Confluence tools are disabled. "
-        "Install with: pip install 'mcp-security-review[atlassian]'"
-    )
-else:
+if _ATLASSIAN_INSTALLED:
     main_mcp.mount("jira", jira_mcp)
     main_mcp.mount("confluence", confluence_mcp)
 
