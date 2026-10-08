@@ -1,7 +1,7 @@
 """Security assessment and requirements generation.
 
 This module provides the main security assessment functionality that analyzes
-Jira tickets and generates security requirements for code generation.
+tickets and generates security requirements for code generation.
 """
 
 import json
@@ -35,10 +35,10 @@ class SecurityAssessment:
         self.guidelines = SecurityGuidelinesLoader()
 
     def assess_ticket(self, ticket_data: dict[str, Any]) -> SecurityRequirements:
-        """Perform a comprehensive security assessment of a Jira ticket.
+        """Perform a comprehensive security assessment of a ticket.
 
         Args:
-            ticket_data: Jira ticket data including summary, description, comments, etc.
+            ticket_data: ticket data including summary, description, comments, etc.
 
         Returns:
             SecurityRequirements with security guidelines and prompt injection

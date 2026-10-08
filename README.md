@@ -6,15 +6,15 @@
 A lightweight MCP server for security reviews built for vibe coding — injects security requirements prior to code generation, scans dependencies for CVEs, and verifies generated code, all without breaking your coding rhythm.
 
 **Jump to installation:**
-- [MCP Server](#quick-start) — full feature set with Jira, Confluence, CVE scanning (with reachability), and threat modeling
-- [Claude Code Plugin](#claude-code-plugin) — install 3 security skills globally in Claude Code (no Jira/MCP needed)
+- [MCP Server](#quick-start) — full feature set with CVE scanning (with reachability) and threat modeling
+- [Claude Code Plugin](#claude-code-plugin) — install 3 security skills globally in Claude Code (no MCP server needed)
 - [Claude Code Skills only](#claude-code-skills) — manually add slash commands to a specific project
 
 ---
 
 ## Claude Code Plugin
 
-Install all three security skills directly into Claude Code — no MCP server, no Jira, no configuration required.
+Install all three security skills directly into Claude Code — no MCP server and no configuration required.
 
 ```
 /plugin install Srajangpt1/ai_security_crew
@@ -42,7 +42,6 @@ If you prefer to add the skills to a specific project only (instead of globally)
 | Tool | When to Use |
 |------|-------------|
 | `lightweight_security_review` | Before any coding task — get security requirements and guidelines for your tech stack |
-| `assess_ticket_security` | Before coding from a Jira ticket — pull security requirements directly from the ticket |
 | `perform_threat_model` | For significant new features — generate a structured threat model (STRIDE, attack surfaces) |
 
 ### Dependency security
@@ -59,14 +58,13 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Threat model persistence
 | Tool | When to Use |
 |------|-------------|
-| `search_previous_threat_models` | Before creating a new threat model — check if one already exists in Confluence |
 | `update_threat_model_file` | After `perform_threat_model` — write the threat model to `threat-model.md` in the repo |
 
 ## Agent Workflow
 
 The server automatically sends workflow instructions to any connecting agent (Claude, Cursor, etc.) via the MCP `initialize` handshake. Agents will follow this workflow without additional configuration:
 
-1. **Before coding** — call `lightweight_security_review` (or `assess_ticket_security` for Jira tickets)
+1. **Before coding** — call `lightweight_security_review`. If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), the agent first fetches it with the matching MCP server you have connected and passes the details in
 2. **When adding packages** — call `verify_packages`, then `scan_dependencies` with the code that uses them
 3. **After generating code** — call `verify_code_security` and follow the `review_prompt` to report findings
 4. **For significant features** — call `perform_threat_model` and persist with `update_threat_model_file`
@@ -104,31 +102,15 @@ Add to your MCP config (Claude Desktop, Cursor, etc.):
       "command": "docker",
       "args": [
         "run", "--rm", "-i",
-        "-e", "JIRA_URL",
-        "-e", "JIRA_USERNAME",
-        "-e", "JIRA_API_TOKEN",
-        "-e", "CONFLUENCE_URL",
-        "-e", "CONFLUENCE_USERNAME",
-        "-e", "CONFLUENCE_API_TOKEN",
         "mcp-security-review:latest"
       ],
       "env": {
-        "PATH": "/usr/local/bin:/usr/bin:/bin",
-        "JIRA_URL": "https://your-domain.atlassian.net",
-        "JIRA_USERNAME": "your-email@example.com",
-        "JIRA_API_TOKEN": "your-token"
+        "PATH": "/usr/local/bin:/usr/bin:/bin"
       }
     }
   }
 }
 ```
-
-### Authentication
-
-Supported methods:
-- **API Token** (Jira/Confluence Cloud): `JIRA_API_TOKEN`, `CONFLUENCE_API_TOKEN`
-- **Personal Access Token** (Server/Data Center): `JIRA_PERSONAL_TOKEN`, `CONFLUENCE_PERSONAL_TOKEN`
-- **OAuth 2.0** (Cloud): run `docker run --rm -it mcp-security-review:latest --oauth-setup`
 
 ### HTTP Transport
 

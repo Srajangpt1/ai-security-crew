@@ -1,4 +1,4 @@
-"""Environment variable utility functions for MCP Atlassian."""
+"""Environment variable utility functions for AI Security Crew."""
 
 import os
 

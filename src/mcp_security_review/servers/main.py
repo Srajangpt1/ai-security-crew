@@ -1,39 +1,23 @@
-"""Main FastMCP server setup for security review workflows."""
-
-from __future__ import annotations
+"""Main MCP server: mounts the security tool servers and filters tools."""
 
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any
 
-from cachetools import TTLCache
 from fastmcp import FastMCP
 from fastmcp.tools import Tool as FastMCPTool
 from mcp.types import Tool as MCPTool
-from starlette.applications import Starlette
-from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from mcp_security_review.utils.environment import get_available_services
 from mcp_security_review.utils.io import is_read_only_mode
-from mcp_security_review.utils.logging import mask_sensitive
 from mcp_security_review.utils.tools import get_enabled_tools, should_include_tool
 
 from .context import MainAppContext
 from .general import general_mcp
 from .sca import sca_mcp
 from .threat_model import threat_model_mcp
-
-if TYPE_CHECKING:
-    from mcp_security_review.providers.atlassian.confluence import ConfluenceFetcher
-    from mcp_security_review.providers.atlassian.confluence.config import (
-        ConfluenceConfig,
-    )
-    from mcp_security_review.providers.atlassian.jira import JiraFetcher
-    from mcp_security_review.providers.atlassian.jira.config import JiraConfig
 
 logger = logging.getLogger("mcp-security-review.server.main")
 
@@ -43,88 +27,18 @@ async def health_check(request: Request) -> JSONResponse:
 
 
 @asynccontextmanager
-async def main_lifespan(app: FastMCP[MainAppContext]) -> AsyncIterator[dict]:
+async def main_lifespan(app: FastMCP[MainAppContext]) -> AsyncIterator[dict[str, Any]]:
     logger.info("Main Security Review MCP server lifespan starting...")
-    services = get_available_services()
     read_only = is_read_only_mode()
     enabled_tools = get_enabled_tools()
 
-    loaded_jira_config: JiraConfig | None = None
-    loaded_confluence_config: ConfluenceConfig | None = None
-
-    if services.get("jira"):
-        try:
-            from mcp_security_review.providers.atlassian.jira.config import JiraConfig
-
-            jira_config = JiraConfig.from_env()
-            if jira_config.is_auth_configured():
-                loaded_jira_config = jira_config
-                logger.info(
-                    "Jira configuration loaded and authentication is configured."
-                )
-            else:
-                logger.warning(
-                    "Jira URL found, but authentication is not fully configured. "
-                    "Jira tools will be unavailable."
-                )
-        except ImportError:
-            logger.warning(
-                "Jira is configured but the Atlassian extra is not installed. "
-                "Install it with: pip install 'mcp-security-review[atlassian]'"
-            )
-        except Exception as e:
-            logger.error(f"Failed to load Jira configuration: {e}", exc_info=True)
-
-    if services.get("confluence"):
-        try:
-            from mcp_security_review.providers.atlassian.confluence.config import (
-                ConfluenceConfig,
-            )
-
-            confluence_config = ConfluenceConfig.from_env()
-            if confluence_config.is_auth_configured():
-                loaded_confluence_config = confluence_config
-                logger.info(
-                    "Confluence configuration loaded and authentication is configured."
-                )
-            else:
-                logger.warning(
-                    "Confluence URL found, but authentication is not fully configured. "
-                    "Confluence tools will be unavailable."
-                )
-        except ImportError:
-            logger.warning(
-                "Confluence is configured but the Atlassian extra is not installed. "
-                "Install it with: pip install 'mcp-security-review[atlassian]'"
-            )
-        except Exception as e:
-            logger.error(f"Failed to load Confluence configuration: {e}", exc_info=True)
-
-    app_context = MainAppContext(
-        full_jira_config=loaded_jira_config,
-        full_confluence_config=loaded_confluence_config,
-        read_only=read_only,
-        enabled_tools=enabled_tools,
-    )
+    app_context = MainAppContext(read_only=read_only, enabled_tools=enabled_tools)
     logger.info(f"Read-only mode: {'ENABLED' if read_only else 'DISABLED'}")
     logger.info(f"Enabled tools filter: {enabled_tools or 'All tools enabled'}")
 
     try:
         yield {"app_lifespan_context": app_context}
-    except Exception as e:
-        logger.error(f"Error during lifespan: {e}", exc_info=True)
-        raise
     finally:
-        logger.info("Main Atlassian MCP server lifespan shutting down...")
-        # Perform any necessary cleanup here
-        try:
-            # Close any open connections if needed
-            if loaded_jira_config:
-                logger.debug("Cleaning up Jira resources...")
-            if loaded_confluence_config:
-                logger.debug("Cleaning up Confluence resources...")
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}", exc_info=True)
         logger.info("Main Security Review MCP server lifespan shutdown complete.")
 
 
@@ -182,33 +96,6 @@ class SecurityReviewMCP(FastMCP[MainAppContext]):
                 )
                 continue
 
-            # Exclude Jira/Confluence tools if config is not fully authenticated
-            is_jira_tool = "jira" in tool_tags
-            is_confluence_tool = "confluence" in tool_tags
-            service_configured_and_available = True
-            if app_lifespan_state:
-                if is_jira_tool and not app_lifespan_state.full_jira_config:
-                    logger.debug(
-                        f"Excluding Jira tool '{registered_name}': "
-                        f"configuration/authentication is incomplete."
-                    )
-                    service_configured_and_available = False
-                if is_confluence_tool and not app_lifespan_state.full_confluence_config:
-                    logger.debug(
-                        f"Excluding Confluence tool '{registered_name}': "
-                        f"configuration/authentication is incomplete."
-                    )
-                    service_configured_and_available = False
-            elif is_jira_tool or is_confluence_tool:
-                logger.warning(
-                    f"Excluding tool '{registered_name}': application context "
-                    f"unavailable to verify service configuration."
-                )
-                service_configured_and_available = False
-
-            if not service_configured_and_available:
-                continue
-
             filtered_tools.append(tool_obj.to_mcp_tool(name=registered_name))
 
         logger.debug(
@@ -216,244 +103,38 @@ class SecurityReviewMCP(FastMCP[MainAppContext]):
         )
         return filtered_tools
 
-    def http_app(
-        self,
-        path: str | None = None,
-        middleware: list[Middleware] | None = None,
-        transport: Literal["streamable-http", "sse"] = "streamable-http",
-    ) -> Starlette:
-        user_token_mw = Middleware(UserTokenMiddleware, mcp_server_ref=self)
-        final_middleware_list = [user_token_mw]
-        if middleware:
-            final_middleware_list.extend(middleware)
-        app = super().http_app(
-            path=path, middleware=final_middleware_list, transport=transport
-        )
-        return app
 
-
-token_validation_cache: TTLCache[  # type: ignore[type-arg]
-    int, tuple[bool, str | None, JiraFetcher | None, ConfluenceFetcher | None]
-] = TTLCache(maxsize=100, ttl=300)
-
-
-class UserTokenMiddleware(BaseHTTPMiddleware):
-    """Middleware to extract Atlassian user tokens from Authorization headers."""
-
-    def __init__(
-        self, app: Any, mcp_server_ref: SecurityReviewMCP | None = None
-    ) -> None:
-        super().__init__(app)
-        self.mcp_server_ref = mcp_server_ref
-        if not self.mcp_server_ref:
-            logger.warning(
-                "UserTokenMiddleware initialized without mcp_server_ref. "
-                "Path matching for MCP endpoint might fail if settings are needed."
-            )
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> JSONResponse:
-        logger.debug(
-            f"UserTokenMiddleware.dispatch: ENTERED for request "
-            f"path='{request.url.path}', method='{request.method}'"
-        )
-        mcp_server_instance = self.mcp_server_ref
-        if mcp_server_instance is None:
-            logger.debug(
-                "UserTokenMiddleware.dispatch: self.mcp_server_ref is None. "
-                "Skipping MCP auth logic."
-            )
-            return await call_next(request)
-
-        mcp_path = mcp_server_instance.settings.streamable_http_path.rstrip("/")
-        request_path = request.url.path.rstrip("/")
-        logger.debug(
-            f"UserTokenMiddleware.dispatch: Comparing request_path='{request_path}' "
-            f"with mcp_path='{mcp_path}'. Request method='{request.method}'"
-        )
-        if request_path == mcp_path and request.method == "POST":
-            auth_header = request.headers.get("Authorization")
-            cloud_id_header = request.headers.get("X-Atlassian-Cloud-Id")
-
-            token_for_log = mask_sensitive(
-                auth_header.split(" ", 1)[1].strip()
-                if auth_header and " " in auth_header
-                else auth_header
-            )
-            logger.debug(
-                f"UserTokenMiddleware: Path='{request.url.path}', "
-                f"AuthHeader='{mask_sensitive(auth_header)}', "
-                f"ParsedToken(masked)='{token_for_log}', "
-                f"CloudId='{cloud_id_header}'"
-            )
-
-            # Extract and save cloudId if provided
-            if cloud_id_header and cloud_id_header.strip():
-                request.state.user_atlassian_cloud_id = cloud_id_header.strip()
-                logger.debug(
-                    f"UserTokenMiddleware: Extracted cloudId from header: "
-                    f"{cloud_id_header.strip()}"
-                )
-            else:
-                request.state.user_atlassian_cloud_id = None
-                logger.debug(
-                    "UserTokenMiddleware: No cloudId header provided, "
-                    "will use global config"
-                )
-
-            # Check for mcp-session-id header for debugging
-            mcp_session_id = request.headers.get("mcp-session-id")
-            if mcp_session_id:
-                logger.debug(
-                    f"UserTokenMiddleware: MCP-Session-ID header found: "
-                    f"{mcp_session_id}"
-                )
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ", 1)[1].strip()
-                if not token:
-                    return JSONResponse(
-                        {"error": "Unauthorized: Empty Bearer token"},
-                        status_code=401,
-                    )
-                logger.debug(
-                    f"UserTokenMiddleware.dispatch: Bearer token extracted "
-                    f"(masked): ...{mask_sensitive(token, 8)}"
-                )
-                request.state.user_atlassian_token = token
-                request.state.user_atlassian_auth_type = "oauth"
-                request.state.user_atlassian_email = None
-                logger.debug(
-                    "UserTokenMiddleware.dispatch: Set request.state "
-                    f"(pre-validation): auth_type='"
-                    f"{getattr(request.state, 'user_atlassian_auth_type', 'N/A')}', "
-                    f"token_present="
-                    f"{bool(getattr(request.state, 'user_atlassian_token', None))}"
-                )
-            elif auth_header and auth_header.startswith("Token "):
-                token = auth_header.split(" ", 1)[1].strip()
-                if not token:
-                    return JSONResponse(
-                        {"error": "Unauthorized: Empty Token (PAT)"},
-                        status_code=401,
-                    )
-                logger.debug(
-                    f"UserTokenMiddleware.dispatch: PAT (Token scheme) extracted "
-                    f"(masked): ...{mask_sensitive(token, 8)}"
-                )
-                request.state.user_atlassian_token = token
-                request.state.user_atlassian_auth_type = "pat"
-                request.state.user_atlassian_email = (
-                    None  # PATs don't carry email in the token itself
-                )
-                logger.debug(
-                    "UserTokenMiddleware.dispatch: Set request.state for PAT auth."
-                )
-            elif auth_header:
-                auth_type = (
-                    auth_header.split(" ", 1)[0]
-                    if " " in auth_header
-                    else "UnknownType"
-                )
-                logger.warning(
-                    f"Unsupported Authorization type for "
-                    f"{request.url.path}: {auth_type}"
-                )
-                return JSONResponse(
-                    {
-                        "error": (
-                            "Unauthorized: Only 'Bearer <OAuthToken>' or "
-                            "'Token <PAT>' types are supported."
-                        )
-                    },
-                    status_code=401,
-                )
-            else:
-                logger.debug(
-                    f"No Authorization header provided for {request.url.path}. "
-                    f"Will proceed with global/fallback server configuration."
-                )
-        response = await call_next(request)
-        logger.debug(
-            f"UserTokenMiddleware.dispatch: EXITED for request "
-            f"path='{request.url.path}'"
-        )
-        return response
-
-
-def build_agent_instructions(atlassian: bool) -> str:
-    """Build the workflow text sent to MCP clients on connect.
-
-    Args:
-        atlassian: Whether the optional Atlassian extra is installed. When false,
-            Jira and Confluence tools are not mentioned.
-
-    Returns:
-        The agent workflow instructions.
-    """
-    jira_line = (
-        "- If working from a Jira ticket and `jira_assess_ticket_security` is "
-        "available, call it instead.\n"
-        if atlassian
-        else ""
-    )
-    confluence_line = (
-        "If `confluence_search` is available, call "
-        "`threatmodel_search_previous_threat_models` first to avoid duplicating "
-        "existing models.\n"
-        if atlassian
-        else ""
-    )
-    return (
-        "# Security Review MCP — Agent Workflow\n\n"
-        "Follow this workflow whenever you write or modify code.\n\n"
-        "## 1. Before you start coding\n"
-        "Call `general_lightweight_security_review` with a description of what you're building and the tech stack.\n"  # noqa: E501
-        "- Use this for any non-trivial coding task to identify risks and get security guidelines upfront.\n"  # noqa: E501
-        + jira_line
-        + "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.\n\n"  # noqa: E501
-        "## 2. When adding or updating dependencies\n"
-        "Run both steps before writing any code that uses the new packages:\n"
-        "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
-        "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs and checks reachability. Act on results:\n"  # noqa: E501
-        "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
-        "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
-        "## 3. After generating code\n"
-        "Call `general_verify_code_security` with the generated code.\n"
-        "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
-        "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
-        "## 4. Persisting threat models (optional)\n"
-        "After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
-         + confluence_line
-    )
-
-
-try:
-    from .confluence import confluence_mcp
-    from .jira import jira_mcp
-
-    _ATLASSIAN_INSTALLED = True
-except ImportError:
-    _ATLASSIAN_INSTALLED = False
-    logger.info(
-        "Atlassian extra not installed; Jira and Confluence tools are disabled. "
-        "Install with: pip install 'mcp-security-review[atlassian]'"
-    )
-
-_AGENT_INSTRUCTIONS = build_agent_instructions(_ATLASSIAN_INSTALLED)
+AGENT_INSTRUCTIONS = (
+    "# Security Review MCP — Agent Workflow\n\n"
+    "Follow this workflow whenever you write or modify code.\n\n"
+    "## 1. Before you start coding\n"
+    "Call `general_lightweight_security_review` with a description of what you're building and the tech stack.\n"  # noqa: E501
+    "- Use this for any non-trivial coding task to identify risks and get security guidelines upfront.\n"  # noqa: E501
+    "- If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, Notion, and so on), fetch it first with the matching MCP server you have connected, then pass its summary, description, and acceptance criteria as the task description.\n"  # noqa: E501
+    "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model`.\n\n"  # noqa: E501
+    "## 2. When adding or updating dependencies\n"
+    "Run both steps before writing any code that uses the new packages:\n"
+    "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
+    "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs and checks reachability. Act on results:\n"  # noqa: E501
+    "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
+    "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
+    "## 3. After generating code\n"
+    "Call `general_verify_code_security` with the generated code.\n"
+    "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
+    "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
+    "## 4. Persisting threat models (optional)\n"
+    "After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
+    "If earlier threat models or design pages exist in a wiki or docs tool you have connected, fetch them first and pass them as `previous_models_json` to avoid duplicating work.\n"  # noqa: E501
+)
 
 main_mcp = SecurityReviewMCP(
     name="Security Review MCP",
     lifespan=main_lifespan,
-    instructions=_AGENT_INSTRUCTIONS,
+    instructions=AGENT_INSTRUCTIONS,
 )
 main_mcp.mount("general", general_mcp)
 main_mcp.mount("threatmodel", threat_model_mcp)
 main_mcp.mount("sca", sca_mcp)
-
-if _ATLASSIAN_INSTALLED:
-    main_mcp.mount("jira", jira_mcp)
-    main_mcp.mount("confluence", confluence_mcp)
 
 
 @main_mcp.custom_route("/healthz", methods=["GET"], include_in_schema=False)

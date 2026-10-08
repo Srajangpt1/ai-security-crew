@@ -1,6 +1,6 @@
-"""Security analyzer for Jira tickets.
+"""Security analyzer for tickets.
 
-This module analyzes Jira ticket content to identify security-relevant information
+This module analyzes ticket content to identify security-relevant information
 and determine appropriate security requirements.
 """
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SecurityContext:
-    """Security context extracted from a Jira ticket."""
+    """Security context extracted from a ticket."""
 
     technologies: list[str]
     security_keywords: set[str]
@@ -25,7 +25,7 @@ class SecurityContext:
 
 
 class SecurityAnalyzer:
-    """Analyzes Jira ticket content for security implications."""
+    """Analyzes ticket content for security implications."""
 
     def __init__(self) -> None:
         self._technology_patterns = self._load_technology_patterns()
@@ -34,10 +34,10 @@ class SecurityAnalyzer:
         self._attack_vector_patterns = self._load_attack_vector_patterns()
 
     def analyze_ticket(self, ticket_data: dict[str, Any]) -> SecurityContext:
-        """Analyze a Jira ticket for security implications.
+        """Analyze a ticket for security implications.
 
         Args:
-            ticket_data: Jira ticket data including summary, description, comments, etc.
+            ticket_data: ticket data including summary, description, comments, etc.
 
         Returns:
             SecurityContext with identified security implications
@@ -77,7 +77,7 @@ class SecurityAnalyzer:
         )
 
     def _extract_text_content(self, ticket_data: dict[str, Any]) -> str:
-        """Extract all text content from a Jira ticket."""
+        """Extract all text content from a ticket."""
         text_parts = []
 
         # Extract summary

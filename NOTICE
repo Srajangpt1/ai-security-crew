@@ -1,19 +1,12 @@
 AI Security Crew
 Copyright (c) 2025 Srajan Gupta
 
-This project includes code derived from mcp-atlassian
+Some shared utilities in src/mcp_security_review/utils/ (env.py, io.py,
+lifecycle.py, logging.py, tools.py) and the server scaffolding in
+src/mcp_security_review/servers/ are adapted from mcp-atlassian
 (https://github.com/sooperset/mcp-atlassian), licensed under the MIT License,
 Copyright (c) 2024 Hyeonsoo Lee. The upstream license text is preserved in
 LICENSE.
-
-Derived paths (Jira and Confluence integration):
-  src/mcp_security_review/providers/atlassian/
-  src/mcp_security_review/models/atlassian/
-  src/mcp_security_review/preprocessing/
-
-Partly derived utilities in src/mcp_security_review/utils/:
-  decorators.py, env.py, environment.py, io.py, oauth.py, oauth_setup.py,
-  ssl.py, tools.py, urls.py
 
 All other code, including everything under src/mcp_security_review/security/
 and src/mcp_security_review/providers/sca/, is original to this project.

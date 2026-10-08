@@ -38,7 +38,7 @@ class TestTransportLifecycleBehavior:
                 with patch.dict("os.environ", {"TRANSPORT": transport}, clear=False):
                     with (
                         patch(
-                            "mcp_security_review.servers.main.AtlassianMCP"
+                            "mcp_security_review.servers.main.SecurityReviewMCP"
                         ) as mock_server_class,
                         patch("click.core.Context") as mock_click_ctx,
                     ):
@@ -142,7 +142,7 @@ class TestTransportLifecycleBehavior:
                 with patch.dict("os.environ", env_vars, clear=False):
                     with (
                         patch(
-                            "mcp_security_review.servers.main.AtlassianMCP"
+                            "mcp_security_review.servers.main.SecurityReviewMCP"
                         ) as mock_server_class,
                         patch("click.core.Context") as mock_click_ctx,
                     ):
@@ -204,15 +204,12 @@ class TestTransportLifecycleBehavior:
             # Simulate Docker environment variables
             docker_env = {
                 "TRANSPORT": "stdio",
-                "JIRA_URL": "https://example.atlassian.net",
-                "JIRA_USERNAME": "user@example.com",
-                "JIRA_API_TOKEN": "token",
             }
 
             with patch.dict("os.environ", docker_env, clear=False):
                 with (
                     patch(
-                        "mcp_security_review.servers.main.AtlassianMCP"
+                        "mcp_security_review.servers.main.SecurityReviewMCP"
                     ) as mock_server_class,
                     patch("sys.stdin", StringIO()),  # Simulate available stdin
                 ):
@@ -259,7 +256,7 @@ class TestRegressionPrevention:
         """Verify signal handlers are properly configured."""
         with patch("mcp_security_review.setup_signal_handlers") as mock_setup:
             with patch("asyncio.run"):
-                with patch("mcp_security_review.servers.main.AtlassianMCP"):
+                with patch("mcp_security_review.servers.main.SecurityReviewMCP"):
                     with patch("sys.argv", ["mcp-security-review"]):
                         try:
                             main()

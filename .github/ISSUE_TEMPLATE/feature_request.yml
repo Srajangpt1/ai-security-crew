@@ -20,7 +20,7 @@ body:
     attributes:
       label: Describe the solution you'd like
       description: A clear and concise description of what you want to happen. How should the feature work?
-      placeholder: "Add a new tool `confluence_move_page` that takes `page_id` and `target_parent_id` arguments..."
+      placeholder: "Add a new tool `sca_check_license` that takes `packages_json` and flags risky licenses..."
     validations:
       required: true
   - type: textarea
@@ -28,13 +28,13 @@ body:
     attributes:
       label: Describe alternatives you've considered
       description: A clear and concise description of any alternative solutions or features you've considered.
-      placeholder: "I considered modifying the `confluence_update_page` tool, but..."
+      placeholder: "I considered extending the `sca_verify_packages` tool, but..."
   - type: textarea
     id: use-case
     attributes:
       label: Use Case
       description: How would this feature benefit users? Who is the target audience?
-      placeholder: "This would allow AI agents to automatically organize documentation..."
+      placeholder: "This would let AI agents catch license problems before adding a package..."
   - type: textarea
     id: additional-context
     attributes:

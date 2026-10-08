@@ -1,4 +1,4 @@
-"""I/O utility functions for MCP Atlassian."""
+"""I/O utility functions for AI Security Crew."""
 
 from mcp_security_review.utils.env import is_env_extended_truthy
 
@@ -8,8 +8,8 @@ def is_read_only_mode() -> bool:
 
     Read-only mode prevents all write operations (create, update, delete)
     while allowing all read operations. This is useful for working with
-    production Atlassian instances where you want to prevent accidental
-    modifications.
+    environments where you want to prevent accidental
+    file modifications.
 
     Returns:
         True if read-only mode is enabled, False otherwise

@@ -251,7 +251,7 @@ if [ $TESTS_FAILED -eq 0 ]; then
     echo "Next steps:"
     echo "  1. Review the documentation in docs/"
     echo "  2. Try adding a custom guideline"
-    echo "  3. Test with your Jira tickets"
+    echo "  3. Try a security review on a real task"
     echo
     exit 0
 else

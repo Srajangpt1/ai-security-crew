@@ -1,4 +1,4 @@
-"""Tool-related utility functions for MCP Atlassian."""
+"""Tool-related utility functions for AI Security Crew."""
 
 import logging
 import os
