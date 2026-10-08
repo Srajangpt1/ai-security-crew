@@ -5,6 +5,7 @@ import pytest
 from mcp_security_review.library import UnknownComponentError
 from mcp_security_review.security import CodeReviewContextBuilder
 
+
 def build(**kwargs):
     return CodeReviewContextBuilder().build_review_context(**kwargs)
 
