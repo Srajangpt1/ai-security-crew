@@ -177,6 +177,12 @@ def test_unknown_reference_is_reported(tmp_path: Path) -> None:
             "components:\n  - id: c\n    name: x\n    applies_when: y\n    colour: red\n",
             "colour",
         ),
+        (
+            "threats:\n  - id: t\n    name: x\n    components: [database]\n"
+            "    severity: low\n    mcp_top10: [MCP11:2025]\n"
+            "    countermeasures: [parameterized-queries]\n",
+            "mcp_top10",
+        ),
         ("surprise: true\n", "unknown top-level key 'surprise'"),
     ],
 )

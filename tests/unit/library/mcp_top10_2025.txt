@@ -1,0 +1,11 @@
+# OWASP MCP Top 10 2025 ids and titles (https://github.com/OWASP/www-project-mcp-top-10), used to check library references.
+MCP01:2025	Token Mismanagement and Secret Exposure
+MCP02:2025	Privilege Escalation via Scope Creep
+MCP03:2025	Tool Poisoning
+MCP04:2025	Software Supply Chain Attacks & Dependency Tampering
+MCP05:2025	Command Injection & Execution
+MCP06:2025	Intent Flow Subversion
+MCP07:2025	Insufficient Authentication & Authorization
+MCP08:2025	Lack of Audit and Telemetry
+MCP09:2025	Shadow MCP Servers
+MCP10:2025	Context Injection & Over-Sharing

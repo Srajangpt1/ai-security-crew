@@ -6,6 +6,7 @@
 #   stride        spoofing | tampering | repudiation | information-disclosure
 #                 | denial-of-service | elevation-of-privilege
 #   cwe           CWE ids, format CWE-<number> (may be empty)
+#   mcp_top10     (optional) OWASP MCP Top 10 2025 ids, such as "MCP06:2025"
 #   countermeasures  ids from countermeasures.yaml that mitigate it
 threats:
   # ---- Web or API endpoint -------------------------------------------------
@@ -411,6 +412,47 @@ threats:
     cwe: [CWE-538]
     countermeasures: [no-vcs-or-env-files-deployed, secrets-manager]
 
+  # ---- Cryptography and transport --------------------------------------------
+  - id: weak-crypto-algorithms
+    name: Broken or outdated algorithms or modes (MD5, SHA-1, DES, ECB) protect sensitive data
+    components: [cryptography]
+    severity: high
+    stride: [tampering, information-disclosure]
+    cwe: [CWE-327]
+    countermeasures: [approved-crypto]
+
+  - id: hardcoded-crypto-keys
+    name: Encryption or signing keys are hardcoded or shared across environments
+    components: [cryptography, secrets-and-config]
+    severity: high
+    stride: [information-disclosure, spoofing]
+    cwe: [CWE-321]
+    countermeasures: [secrets-manager, separate-keys-per-environment]
+
+  - id: weak-random-generator
+    name: Tokens, ids, or nonces come from a random generator that attackers can predict
+    components: [cryptography]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-338]
+    countermeasures: [crypto-random-tokens]
+
+  - id: cleartext-transport
+    name: Sensitive data travels over plain HTTP or an unencrypted connection
+    components: [transport-security, web-endpoint]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-319]
+    countermeasures: [https-everywhere]
+
+  - id: outdated-tls
+    name: Old TLS or SSL versions or weak cipher suites are still enabled
+    components: [transport-security]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-327]
+    countermeasures: [modern-tls-config]
+
   # ---- User-generated content and browser frontend ---------------------------
   - id: stored-xss
     name: Attacker-supplied content is shown to other users as HTML or script
@@ -610,6 +652,7 @@ threats:
     severity: high
     stride: [tampering, elevation-of-privilege]
     cwe: []
+    mcp_top10: ["MCP06:2025"]
     countermeasures: [treat-model-input-as-untrusted, validate-model-output]
 
   - id: unsafe-model-output
@@ -618,6 +661,7 @@ threats:
     severity: high
     stride: [tampering, elevation-of-privilege]
     cwe: [CWE-74]
+    mcp_top10: ["MCP05:2025"]
     countermeasures: [validate-model-output]
 
   - id: sensitive-data-sent-to-model
@@ -626,6 +670,7 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-201]
+    mcp_top10: ["MCP10:2025"]
     countermeasures: [minimize-data-sent-to-model]
 
   - id: model-cost-abuse
@@ -643,6 +688,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege]
     cwe: [CWE-250]
+    mcp_top10: ["MCP02:2025"]
     countermeasures: [least-privilege-agent-tools, human-approval-for-risky-actions]
 
   - id: indirect-prompt-injection
@@ -651,6 +697,7 @@ threats:
     severity: high
     stride: [tampering, elevation-of-privilege]
     cwe: []
+    mcp_top10: ["MCP06:2025"]
     countermeasures: [treat-model-input-as-untrusted, human-approval-for-risky-actions]
 
   - id: agent-data-exfiltration
@@ -659,6 +706,7 @@ threats:
     severity: high
     stride: [information-disclosure]
     cwe: [CWE-201]
+    mcp_top10: ["MCP01:2025", "MCP10:2025"]
     countermeasures: [restrict-agent-outbound, keep-secrets-out-of-agent-reach]
 
   - id: untrusted-mcp-server
@@ -667,6 +715,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege]
     cwe: [CWE-829]
+    mcp_top10: ["MCP03:2025", "MCP04:2025"]
     countermeasures: [pin-and-review-mcp-servers]
 
   # ---- Coding agent configuration --------------------------------------------
@@ -676,6 +725,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege, tampering]
     cwe: [CWE-829]
+    mcp_top10: ["MCP03:2025", "MCP04:2025"]
     countermeasures: [review-agent-extensions]
 
   - id: broad-agent-permission-rules
@@ -684,6 +734,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege]
     cwe: [CWE-250]
+    mcp_top10: ["MCP02:2025"]
     countermeasures: [narrow-agent-permission-rules, human-approval-for-risky-actions]
 
   - id: agent-reads-secrets
@@ -692,4 +743,5 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-200]
+    mcp_top10: ["MCP01:2025"]
     countermeasures: [keep-secrets-out-of-agent-reach]
