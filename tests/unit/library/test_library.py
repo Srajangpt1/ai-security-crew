@@ -133,3 +133,14 @@ def test_menu_lists_every_component(library: Library) -> None:
     menu = library.menu()
     assert [m["id"] for m in menu] == list(library.components)
     assert all(m["applies_when"] for m in menu)
+
+
+def test_baseline_countermeasures_are_flagged(library: Library) -> None:
+    ids = {m.id for m in library.baseline_countermeasures()}
+    assert ids == {
+        "secrets-manager",
+        "parameterized-queries",
+        "server-side-validation",
+        "log-without-secrets",
+        "generic-error-messages",
+    }

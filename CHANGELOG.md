@@ -9,9 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed — code review and threat modeling use the threat library
-- `verify_code_security` takes `components`, `data_handled`, `language`, and `project_root` instead of `security_context`. Its focus areas and checklist come from the library's threats and countermeasures for the components you name, plus the language hints and a short baseline. The language is chosen by the `language` argument or the file extension, never by scanning the code
+- `verify_code_security` takes `components`, `data_handled`, and `project_root` instead of `security_context`. Its focus areas and checklist come from the library's threats and countermeasures for the components you name, plus a short baseline. There is no language detection; the agent adapts each fix to its own stack
 - `perform_threat_model` takes `components`, `data_handled`, and `project_root`, and returns `known_threats` (library threats and countermeasures, or the component menu) in place of `security_signals`
-- Language hints (focus areas, checks, file extensions) now live in `library/languages.yaml` and can be extended per project; countermeasures can be marked `baseline: true`
+- Countermeasures can be marked `baseline: true` to always appear in code review checklists
 - Removed the keyword analyzer (`security/analyzer.py`) and all regex-based technology detection
 
 ### Changed — threat library replaces the OWASP guideline files

@@ -31,7 +31,7 @@ async def test_verify_code_uses_components_and_language() -> None:
     )
 
     assert data["success"] is True
-    assert data["context"]["technologies_detected"] == ["python"]
+    assert "technologies_detected" not in data["context"]
     assert data["context"]["components"] == ["file-upload"]
     assert data["context"]["risk_level"] == "high"
     assert "hint" not in data

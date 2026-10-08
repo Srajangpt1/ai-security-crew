@@ -120,7 +120,7 @@ AGENT_INSTRUCTIONS = (
     "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
     "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
     "## 3. After generating code\n"
-    "Call `general_verify_code_security` with the generated code and the same `components` (it picks the language from `file_path`).\n"  # noqa: E501
+    "Call `general_verify_code_security` with the generated code and the same `components`.\n"  # noqa: E501
     "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
     "- Follow the `review_prompt` in the response to perform the analysis and report findings.\n\n"  # noqa: E501
     "## 4. Persisting threat models (optional)\n"

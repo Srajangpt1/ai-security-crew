@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-from .models import SEVERITY_RANK, Component, Countermeasure, Language, Severity, Threat
+from .models import SEVERITY_RANK, Component, Countermeasure, Severity, Threat
 
 SENSITIVE_DATA_TYPES = (
     "credentials",
@@ -53,20 +53,6 @@ class Library:
     components: dict[str, Component]
     threats: dict[str, Threat]
     countermeasures: dict[str, Countermeasure]
-    languages: dict[str, Language] = field(default_factory=dict)
-
-    def language_for(
-        self, file_path: str | None = None, language: str | None = None
-    ) -> Language | None:
-        """Find a language by explicit id, or by the file extension of a path."""
-        if language:
-            return self.languages.get(language.strip().lower())
-        if file_path:
-            lowered = file_path.lower()
-            for candidate in self.languages.values():
-                if any(lowered.endswith(ext) for ext in candidate.extensions):
-                    return candidate
-        return None
 
     def baseline_countermeasures(self) -> list[Countermeasure]:
         """Countermeasures that belong in every code review checklist."""

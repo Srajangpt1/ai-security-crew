@@ -53,7 +53,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 ### Post-coding
 | Tool | When to Use |
 |------|-------------|
-| `verify_code_security` | After generating code — get a checklist aimed at the components' threats and the language, for your agent to review the code against |
+| `verify_code_security` | After generating code — get a checklist aimed at the components' threats, for your agent to review the code against |
 
 ### Threat model persistence
 | Tool | When to Use |

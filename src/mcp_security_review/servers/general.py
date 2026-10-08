@@ -197,7 +197,7 @@ async def verify_code_security(
     file_path: Annotated[
         str,
         Field(
-            description="Optional file path for language detection (e.g., 'auth.py')",
+            description="Optional file path, shown in the review (e.g., 'auth.py')",
             default="",
         ),
     ] = "",
@@ -222,16 +222,6 @@ async def verify_code_security(
             default="",
         ),
     ] = "",
-    language: Annotated[
-        str,
-        Field(
-            description=(
-                "Optional language id (python, javascript, typescript, react, "
-                "java, sql, go). Overrides the file extension."
-            ),
-            default="",
-        ),
-    ] = "",
     project_root: Annotated[
         str,
         Field(
@@ -251,7 +241,7 @@ async def verify_code_security(
 
     YOU (the AI) will perform the actual security analysis using:
     - The security checklist provided
-    - The focus areas for the language and the components you name
+    - The focus areas for the components you name
     - Your knowledge of security best practices
 
     Recommended workflow:
@@ -264,10 +254,9 @@ async def verify_code_security(
     Args:
         ctx: The FastMCP context.
         code: The source code to review.
-        file_path: Optional file path; its extension selects the language.
+        file_path: Optional file path, shown in the review.
         components: Component ids the code implements (from the pre-coding review).
         data_handled: Kinds of sensitive data involved (optional).
-        language: Optional language id, overrides the file extension.
         project_root: Project folder with optional custom library files.
 
     Returns:
@@ -275,7 +264,7 @@ async def verify_code_security(
         - review_prompt: Detailed instructions for performing the security review
         - security_checklist: Items to verify in the code
         - focus_areas: Specific vulnerability types to look for
-        - context: language, components, and risk level
+        - context: file path, components, and risk level
         - code: The code to review (for reference)
 
     After receiving this response, analyze the code and provide:
@@ -302,7 +291,6 @@ async def verify_code_security(
             file_path=file_path if file_path else None,
             components=split_ids(components) or None,
             data_handled=split_ids(data_handled) or None,
-            language=language if language else None,
         )
     except UnknownComponentError as e:
         return unknown_component_error(e, {"code_to_review": code})
@@ -320,7 +308,6 @@ async def verify_code_security(
             "review_prompt": review_context.review_prompt,
             "context": {
                 "file_path": file_path if file_path else "not_specified",
-                "technologies_detected": review_context.technologies_detected,
                 "components": review_context.components,
                 "risk_level": review_context.risk_level,
             },

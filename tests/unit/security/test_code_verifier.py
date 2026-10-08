@@ -12,23 +12,12 @@ def build(**kwargs):
     return CodeReviewContextBuilder().build_review_context(code=CODE, **kwargs)
 
 
-def test_language_comes_from_the_file_extension() -> None:
+def test_no_components_gives_only_the_baseline_checklist() -> None:
     context = build(file_path="app/views.py")
 
-    assert context.technologies_detected == ["python"]
-    assert "Unsafe deserialization (pickle)" in context.review_focus_areas
-    assert "subprocess calls use shell=False" in context.security_checklist
-
-
-def test_explicit_language_overrides_the_extension() -> None:
-    context = build(file_path="notes.txt", language="go")
-    assert context.technologies_detected == ["go"]
-
-
-def test_code_content_is_never_used_to_guess_the_language() -> None:
-    # Obvious Python, but without a path or language nothing is guessed.
-    context = build()
-    assert context.technologies_detected == []
+    assert context.components == []
+    assert context.review_focus_areas == []
+    assert len(context.security_checklist) == 5
 
 
 def test_components_target_the_checklist_at_their_threats() -> None:
@@ -78,4 +67,4 @@ def test_review_prompt_contains_the_code_and_checklist() -> None:
     assert CODE in context.review_prompt
     assert "### Security Checklist" in context.review_prompt
     assert "**Components:** file-upload" in context.review_prompt
-    assert "**Language:** python" in context.review_prompt
+    assert "Language" not in context.review_prompt

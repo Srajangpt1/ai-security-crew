@@ -2,8 +2,8 @@
 
 This module prepares security context and review prompts for the AI agent
 to perform security analysis on generated code. The focus areas and checklist
-come from the threat library (for the components the agent names) and from the
-language hints in the library. Nothing scans the code to guess what it does.
+come from the threat library for the components the agent names, plus a short
+baseline. Nothing scans the code to guess what it does.
 """
 
 from dataclasses import dataclass, field
@@ -20,7 +20,6 @@ class SecurityReviewContext:
 
     code: str
     file_path: str | None
-    technologies_detected: list[str] = field(default_factory=list)
     components: list[str] = field(default_factory=list)
     risk_level: str | None = None
     review_focus_areas: list[str] = field(default_factory=list)
@@ -40,17 +39,15 @@ class CodeReviewContextBuilder:
         file_path: str | None = None,
         components: list[str] | None = None,
         data_handled: list[str] | None = None,
-        language: str | None = None,
     ) -> SecurityReviewContext:
         """Build context for AI security review.
 
         Args:
             code: The source code to review.
-            file_path: Optional file path, used to pick the language by extension.
+            file_path: Optional file path, shown in the review prompt.
             components: Library component ids the code implements, as chosen in
                 the pre-coding review. Targets the checklist at their threats.
             data_handled: Kinds of sensitive data involved (raises the risk level).
-            language: Optional language id. Overrides the file extension.
 
         Returns:
             SecurityReviewContext with all information needed for AI review.
@@ -58,10 +55,7 @@ class CodeReviewContextBuilder:
         Raises:
             UnknownComponentError: If a component id is not in the library.
         """
-        lang = self._library.language_for(file_path, language)
-        technologies = [lang.id] if lang else []
-
-        focus_areas: list[str] = list(lang.focus) if lang else []
+        focus_areas: list[str] = []
         checklist: list[str] = []
         risk_level: str | None = None
         picked: list[str] = []
@@ -76,8 +70,6 @@ class CodeReviewContextBuilder:
                 checklist.append(f"{measure.name}: {measure.how_to}")
                 covered.add(measure.id)
 
-        if lang:
-            checklist.extend(lang.checks)
         for measure in self._library.baseline_countermeasures():
             if measure.id not in covered:
                 checklist.append(f"{measure.name}: {measure.how_to}")
@@ -88,7 +80,6 @@ class CodeReviewContextBuilder:
         review_prompt = self._build_review_prompt(
             code=code,
             file_path=file_path,
-            technologies=technologies,
             components=picked,
             risk_level=risk_level,
             focus_areas=focus_areas,
@@ -98,7 +89,6 @@ class CodeReviewContextBuilder:
         return SecurityReviewContext(
             code=code,
             file_path=file_path,
-            technologies_detected=technologies,
             components=picked,
             risk_level=risk_level,
             review_focus_areas=focus_areas,
@@ -110,7 +100,6 @@ class CodeReviewContextBuilder:
         self,
         code: str,
         file_path: str | None,
-        technologies: list[str],
         components: list[str],
         risk_level: str | None,
         focus_areas: list[str],
@@ -126,8 +115,6 @@ class CodeReviewContextBuilder:
         # Context
         if file_path:
             prompt_parts.append(f"**File:** `{file_path}`")
-        if technologies:
-            prompt_parts.append(f"**Language:** {', '.join(technologies)}")
         if components:
             prompt_parts.append(f"**Components:** {', '.join(components)}")
         if risk_level:

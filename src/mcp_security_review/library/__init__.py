@@ -8,13 +8,12 @@ from .library import (
     describe,
 )
 from .loader import LibraryError, load_library
-from .models import Component, Countermeasure, Language, Severity, Threat
+from .models import Component, Countermeasure, Severity, Threat
 
 __all__ = [
     "SENSITIVE_DATA_TYPES",
     "Component",
     "Countermeasure",
-    "Language",
     "Library",
     "LibraryError",
     "Resolution",

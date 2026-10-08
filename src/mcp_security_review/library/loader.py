@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from .library import Library
-from .models import Component, Countermeasure, Language, Threat
+from .models import Component, Countermeasure, Threat
 
 logger = logging.getLogger("mcp-security-review.library")
 
@@ -20,7 +20,6 @@ _KINDS: dict[str, type[BaseModel]] = {
     "components": Component,
     "threats": Threat,
     "countermeasures": Countermeasure,
-    "languages": Language,
 }
 
 
@@ -64,7 +63,6 @@ def load_library(project_root: Path | None = None) -> Library:
     components = dict(builtin.components)
     threats = dict(builtin.threats)
     countermeasures = dict(builtin.countermeasures)
-    languages = dict(builtin.languages)
     added: dict[str, set[str]] = {kind: set() for kind in _KINDS}
     disabled: set[str] = set()
 
@@ -75,7 +73,6 @@ def load_library(project_root: Path | None = None) -> Library:
             ("components", components),
             ("threats", threats),
             ("countermeasures", countermeasures),
-            ("languages", languages),
         ):
             for entry in _parse_entries(kind, data.get(kind), path, errors):
                 if entry.id in added[kind]:
@@ -95,8 +92,7 @@ def load_library(project_root: Path | None = None) -> Library:
     components, threats, countermeasures = _apply_disable(
         disabled, components, threats, countermeasures
     )
-    languages = {k: v for k, v in languages.items() if k not in disabled}
-    library = Library(components, threats, countermeasures, languages)
+    library = Library(components, threats, countermeasures)
     check_references(library)
     return library
 
@@ -151,7 +147,6 @@ def _builtin_library() -> Library:
         loaded["components"],
         loaded["threats"],
         loaded["countermeasures"],
-        loaded["languages"],
     )
     check_references(library)
     return library

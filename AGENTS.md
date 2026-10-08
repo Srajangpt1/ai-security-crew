@@ -41,7 +41,7 @@ Run both steps before writing code that uses the new packages:
 Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects (`"pypi"` or `"npm"`).
 
 ### After generating code
-- Call `general_verify_code_security` with the generated code and the same `components`; the language comes from `file_path`. Follow the `review_prompt` in the response to perform the analysis and report findings.
+- Call `general_verify_code_security` with the generated code and the same `components`. Follow the `review_prompt` in the response to perform the analysis and report findings.
 
 ### Persisting threat models
 - After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.

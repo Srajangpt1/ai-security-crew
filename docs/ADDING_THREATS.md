@@ -46,13 +46,6 @@ countermeasures:
     effort: low                         # low | medium | high
     asvs: []                            # optional, format v5.0.0-<chapter>.<section>.<item>
 
-languages:                              # optional: hints for code review
-  - id: kotlin
-    name: Kotlin
-    extensions: [.kt]                   # selects the language from a file path
-    focus: [Unsafe WebView JavaScript bridges]   # what to look for
-    checks: [JavaScript interfaces expose only the methods the page needs]
-
 disable: [open-redirect]                # optional: hide built-in entries by id
 ```
 
@@ -67,8 +60,6 @@ disable: [open-redirect]                # optional: hide built-in entries by id
 - Every reference must exist. Unknown fields, bad severities, and malformed CWE or ASVS
   ids are reported together, and the tool returns that list instead of a review.
 - A countermeasure with `baseline: true` is added to every code review checklist.
-- `verify_code_security` chooses a language from the `language` argument or the file
-  extension in `languages`. It never guesses from the code itself.
 - The risk level of a review is the highest severity among the threats on the components
   the agent picked. Sensitive data (`data_handled`) raises it one step.
 
