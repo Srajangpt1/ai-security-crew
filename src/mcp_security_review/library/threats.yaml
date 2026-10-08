@@ -1,0 +1,695 @@
+# Threats: what an attacker (or a mistake) does to a component.
+#   id            stable slug
+#   name          one sentence a developer understands
+#   components    which components it applies to (must exist in components.yaml)
+#   severity      critical | high | medium | low
+#   stride        spoofing | tampering | repudiation | information-disclosure
+#                 | denial-of-service | elevation-of-privilege
+#   cwe           CWE ids, format CWE-<number> (may be empty)
+#   countermeasures  ids from countermeasures.yaml that mitigate it
+threats:
+  # ---- Web or API endpoint -------------------------------------------------
+  - id: csrf
+    name: Another website makes a logged-in user's browser perform actions
+    components: [web-endpoint, session-management]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-352]
+    countermeasures: [csrf-protection, secure-cookie-attributes]
+
+  - id: permissive-cors
+    name: Any website can read authenticated API responses because CORS allows every origin
+    components: [web-endpoint, browser-frontend]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-942]
+    countermeasures: [strict-cors]
+
+  - id: missing-rate-limit
+    name: Attackers hammer an endpoint to brute-force, scrape, or run up your costs
+    components: [web-endpoint]
+    severity: medium
+    stride: [denial-of-service]
+    cwe: [CWE-770]
+    countermeasures: [rate-limiting]
+
+  - id: missing-security-headers
+    name: Pages can be framed, sniffed, or loaded over plain HTTP because headers are missing
+    components: [web-endpoint, browser-frontend]
+    severity: low
+    stride: [tampering]
+    cwe: [CWE-1021]
+    countermeasures: [security-headers]
+
+  - id: open-redirect
+    name: A link on your domain sends users to an attacker-chosen site
+    components: [web-endpoint]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-601]
+    countermeasures: [validate-redirect-targets]
+
+  - id: mass-assignment
+    name: A request sets fields the user should not control, such as role or price
+    components: [web-endpoint, database]
+    severity: high
+    stride: [elevation-of-privilege, tampering]
+    cwe: [CWE-915]
+    countermeasures: [allow-list-fields, check-permissions-server-side]
+
+  - id: excessive-data-exposure
+    name: API responses include more fields than the client needs, such as hashes or internal ids
+    components: [web-endpoint]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-200]
+    countermeasures: [return-minimal-fields]
+
+  - id: missing-input-validation
+    name: Unvalidated input reaches business logic and breaks assumptions
+    components: [web-endpoint, background-job]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-20]
+    countermeasures: [server-side-validation]
+
+  - id: business-flow-bypass
+    name: A user skips or repeats steps in a multi-step flow, such as verification or checkout
+    components: [web-endpoint, payment-flow]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-840]
+    countermeasures: [enforce-flow-order]
+
+  # ---- Login and account management ---------------------------------------
+  - id: credential-stuffing
+    name: Attackers try leaked or guessed passwords against your login at scale
+    components: [authentication]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-307]
+    countermeasures: [login-attempt-limits, breached-password-check, offer-mfa]
+
+  - id: weak-password-storage
+    name: Passwords are stored in plain text or with a fast hash, so a database leak exposes them
+    components: [authentication, database]
+    severity: critical
+    stride: [information-disclosure]
+    cwe: [CWE-916]
+    countermeasures: [slow-password-hashing]
+
+  - id: weak-password-rules
+    name: Short or restricted passwords are easy to guess
+    components: [authentication]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-521]
+    countermeasures: [sensible-password-rules, breached-password-check]
+
+  - id: insecure-password-reset
+    name: Password reset can be abused to take over accounts
+    components: [authentication, email-sending]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-640]
+    countermeasures: [secure-reset-flow]
+
+  - id: default-accounts
+    name: Default or hardcoded admin accounts are left active
+    components: [authentication, secrets-and-config]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-798]
+    countermeasures: [remove-default-accounts]
+
+  - id: no-second-factor
+    name: A stolen password is enough to take over sensitive accounts
+    components: [authentication]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-308]
+    countermeasures: [offer-mfa]
+
+  - id: user-enumeration
+    name: Login or reset responses reveal which emails have accounts
+    components: [authentication]
+    severity: low
+    stride: [information-disclosure]
+    cwe: [CWE-204]
+    countermeasures: [generic-error-messages]
+
+  # ---- Sessions and tokens ---------------------------------------------------
+  - id: session-fixation
+    name: An attacker plants a session id before login and reuses it afterwards
+    components: [session-management]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-384]
+    countermeasures: [new-session-on-login]
+
+  - id: predictable-tokens
+    name: Session ids, reset tokens, or API keys can be guessed
+    components: [session-management, authentication]
+    severity: high
+    stride: [spoofing]
+    cwe: [CWE-330]
+    countermeasures: [crypto-random-tokens]
+
+  - id: sessions-not-ended
+    name: Logout, password change, or account removal leaves sessions or tokens valid
+    components: [session-management]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-613]
+    countermeasures: [proper-logout-and-expiry]
+
+  - id: insecure-cookie-flags
+    name: Session cookies can be read by scripts or sent over plain HTTP
+    components: [session-management, browser-frontend]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-614, CWE-1004]
+    countermeasures: [secure-cookie-attributes]
+
+  - id: jwt-tampering
+    name: Forged or unsigned JWTs are accepted
+    components: [session-management]
+    severity: high
+    stride: [spoofing, elevation-of-privilege]
+    cwe: [CWE-347]
+    countermeasures: [verify-token-signature]
+
+  - id: token-claims-unchecked
+    name: Expired tokens or tokens meant for another service are accepted
+    components: [session-management]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-345]
+    countermeasures: [validate-token-claims]
+
+  - id: tokens-leak-via-url-or-storage
+    name: Tokens in URLs or browser storage leak through logs, referrers, or scripts
+    components: [session-management, browser-frontend]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-598]
+    countermeasures: [no-secrets-in-urls, no-sensitive-data-in-browser-storage]
+
+  # ---- Permissions and data access -----------------------------------------
+  - id: missing-function-authorization
+    name: A user calls an admin or other-role function because only the UI hides it
+    components: [authorization, web-endpoint]
+    severity: critical
+    stride: [elevation-of-privilege]
+    cwe: [CWE-862]
+    countermeasures: [check-permissions-server-side]
+
+  - id: object-id-guessing
+    name: One user reads or changes another user's data by changing an id in the request
+    components: [authorization, web-endpoint, object-storage]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-639]
+    countermeasures: [per-object-authorization]
+
+  - id: role-self-assignment
+    name: A user grants themselves a higher role through a profile or signup request
+    components: [authorization, authentication]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-269]
+    countermeasures: [allow-list-fields, check-permissions-server-side]
+
+  - id: tenant-data-leak
+    name: Queries miss the tenant filter, so customers see each other's data
+    components: [authorization, database]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-284]
+    countermeasures: [scope-queries-to-tenant]
+
+  # ---- Database --------------------------------------------------------------
+  - id: sql-injection
+    name: Attacker input changes the meaning of a database query
+    components: [database]
+    severity: critical
+    stride: [tampering, information-disclosure]
+    cwe: [CWE-89]
+    countermeasures: [parameterized-queries]
+
+  - id: nosql-injection
+    name: Query operators in user input bypass filters in a NoSQL database
+    components: [database]
+    severity: high
+    stride: [tampering, information-disclosure]
+    cwe: [CWE-943]
+    countermeasures: [parameterized-queries, server-side-validation]
+
+  - id: over-privileged-db-account
+    name: The app connects as an admin database user, so any flaw becomes full data access
+    components: [database]
+    severity: medium
+    stride: [elevation-of-privilege]
+    cwe: [CWE-250]
+    countermeasures: [least-privilege-accounts]
+
+  - id: sensitive-data-unencrypted
+    name: Sensitive fields are stored unencrypted, so a backup or database leak exposes them
+    components: [database, object-storage]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-311]
+    countermeasures: [encrypt-sensitive-data]
+
+  # ---- File upload -----------------------------------------------------------
+  - id: upload-executable-file
+    name: Attacker uploads a script that your server runs or serves
+    components: [file-upload]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-434]
+    countermeasures: [upload-allow-list, upload-rename-and-isolate]
+
+  - id: upload-path-traversal
+    name: Attacker uses ../ in a filename to overwrite files
+    components: [file-upload]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-22]
+    countermeasures: [upload-rename-and-isolate]
+
+  - id: upload-resource-exhaustion
+    name: Huge files or compression bombs fill disk or memory
+    components: [file-upload]
+    severity: medium
+    stride: [denial-of-service]
+    cwe: [CWE-770]
+    countermeasures: [upload-size-limits]
+
+  - id: upload-active-content
+    name: An uploaded SVG or HTML file runs script when other users open it
+    components: [file-upload, user-generated-content]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-79]
+    countermeasures: [serve-uploads-safely, sanitize-html]
+
+  # ---- Object or file storage -----------------------------------------------
+  - id: public-bucket
+    name: Storage bucket is publicly listable or readable
+    components: [object-storage]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-732]
+    countermeasures: [private-storage-signed-urls]
+
+  - id: long-lived-storage-credentials
+    name: Long-lived storage keys are shipped to the browser or mobile app
+    components: [object-storage, browser-frontend]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-798]
+    countermeasures: [short-lived-scoped-credentials]
+
+  # ---- Outbound HTTP calls ---------------------------------------------------
+  - id: ssrf
+    name: The server is tricked into fetching internal addresses or cloud metadata
+    components: [outbound-http-request]
+    severity: high
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-918]
+    countermeasures: [ssrf-allow-list, no-redirect-following]
+
+  - id: tls-verification-disabled
+    name: Outbound calls skip certificate checks, so traffic can be intercepted
+    components: [outbound-http-request]
+    severity: high
+    stride: [spoofing, information-disclosure]
+    cwe: [CWE-295]
+    countermeasures: [validate-tls-certificates]
+
+  - id: no-timeouts-or-size-caps
+    name: A slow or huge remote response ties up workers and memory
+    components: [outbound-http-request, background-job]
+    severity: low
+    stride: [denial-of-service]
+    cwe: [CWE-400]
+    countermeasures: [timeouts-and-size-caps]
+
+  # ---- Incoming webhooks -----------------------------------------------------
+  - id: forged-webhook
+    name: Anyone can post fake events to your webhook endpoint
+    components: [third-party-webhook]
+    severity: high
+    stride: [spoofing, tampering]
+    cwe: [CWE-345]
+    countermeasures: [verify-webhook-signature]
+
+  - id: webhook-replay
+    name: A captured webhook is sent again to repeat its effect
+    components: [third-party-webhook]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-294]
+    countermeasures: [reject-replayed-events, idempotency-and-transactions]
+
+  # ---- Payments and orders ---------------------------------------------------
+  - id: client-side-price-tampering
+    name: The client sends the price or amount and the server trusts it
+    components: [payment-flow]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-602]
+    countermeasures: [server-side-pricing]
+
+  - id: double-processing
+    name: Concurrent or repeated requests charge, refund, or fulfil an order twice
+    components: [payment-flow, third-party-webhook]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-362]
+    countermeasures: [idempotency-and-transactions]
+
+  - id: unconfirmed-payment-status
+    name: An order is marked paid because of a browser redirect rather than a verified payment
+    components: [payment-flow]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-602]
+    countermeasures: [confirm-payment-server-side]
+
+  - id: card-data-in-your-systems
+    name: Card numbers pass through or are stored in your servers and logs
+    components: [payment-flow, logging-and-errors]
+    severity: critical
+    stride: [information-disclosure]
+    cwe: [CWE-312]
+    countermeasures: [hosted-payment-fields, log-without-secrets]
+
+  # ---- Secrets and configuration ---------------------------------------------
+  - id: hardcoded-secrets
+    name: API keys or passwords are committed to the repo or baked into code
+    components: [secrets-and-config]
+    severity: critical
+    stride: [information-disclosure]
+    cwe: [CWE-798]
+    countermeasures: [secrets-manager]
+
+  - id: debug-mode-in-production
+    name: Debug features or consoles are left on in production
+    components: [secrets-and-config, web-endpoint]
+    severity: high
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-489]
+    countermeasures: [disable-debug-in-prod]
+
+  - id: exposed-config-files
+    name: .env, .git, or backup files are reachable from the web
+    components: [secrets-and-config, web-endpoint]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-538]
+    countermeasures: [no-vcs-or-env-files-deployed, secrets-manager]
+
+  # ---- User-generated content and browser frontend ---------------------------
+  - id: stored-xss
+    name: Attacker-supplied content is shown to other users as HTML or script
+    components: [user-generated-content]
+    severity: high
+    stride: [tampering, information-disclosure]
+    cwe: [CWE-79]
+    countermeasures: [output-encoding, sanitize-html]
+
+  - id: dom-xss
+    name: Frontend code writes untrusted data into the page with unsafe DOM APIs
+    components: [browser-frontend]
+    severity: high
+    stride: [tampering, information-disclosure]
+    cwe: [CWE-79]
+    countermeasures: [safe-dom-apis, output-encoding]
+
+  - id: third-party-script-compromise
+    name: A compromised third-party script or CDN file runs in your pages
+    components: [browser-frontend]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-829]
+    countermeasures: [subresource-integrity, security-headers]
+
+  # ---- Background jobs -------------------------------------------------------
+  - id: untrusted-job-payload
+    name: Queue messages are trusted without checking, so one bad message breaks the worker or the data
+    components: [background-job]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-20]
+    countermeasures: [validate-job-input]
+
+  - id: runaway-retries
+    name: Failing jobs retry forever and starve other work
+    components: [background-job]
+    severity: low
+    stride: [denial-of-service]
+    cwe: [CWE-400]
+    countermeasures: [bounded-retries]
+
+  # ---- Parsing and deserialization -------------------------------------------
+  - id: unsafe-deserialization
+    name: Untrusted data is deserialized with a format that can run code, such as pickle
+    components: [serialization-and-parsing]
+    severity: critical
+    stride: [elevation-of-privilege]
+    cwe: [CWE-502]
+    countermeasures: [avoid-unsafe-deserializers]
+
+  - id: xxe
+    name: An XML parser loads external files or URLs named in untrusted XML
+    components: [serialization-and-parsing]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-611]
+    countermeasures: [disable-xml-external-entities]
+
+  - id: archive-path-traversal
+    name: An uploaded archive writes files outside the target folder when extracted
+    components: [serialization-and-parsing, file-upload]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-22]
+    countermeasures: [safe-archive-extraction]
+
+  # ---- OS commands and dynamic code ------------------------------------------
+  - id: command-injection
+    name: User input ends up in a shell command
+    components: [shell-and-dynamic-code]
+    severity: critical
+    stride: [elevation-of-privilege]
+    cwe: [CWE-78]
+    countermeasures: [avoid-shell-and-eval]
+
+  - id: code-injection
+    name: User input is evaluated as code or used to build a template
+    components: [shell-and-dynamic-code]
+    severity: critical
+    stride: [elevation-of-privilege]
+    cwe: [CWE-94]
+    countermeasures: [avoid-shell-and-eval]
+
+  # ---- Email and notifications -----------------------------------------------
+  - id: email-header-injection
+    name: Line breaks in user input add recipients or headers to outgoing mail
+    components: [email-sending]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-93]
+    countermeasures: [sanitize-mail-input]
+
+  - id: poisoned-email-links
+    name: Links in emails are built from the Host header, so attackers redirect reset links
+    components: [email-sending, authentication]
+    severity: medium
+    stride: [spoofing]
+    cwe: [CWE-640]
+    countermeasures: [fixed-base-url-for-links]
+
+  - id: email-abuse
+    name: Send endpoints are used to spam people or exhaust your sending quota
+    components: [email-sending]
+    severity: medium
+    stride: [denial-of-service]
+    cwe: [CWE-770]
+    countermeasures: [rate-limiting]
+
+  # ---- Packages and dependencies ---------------------------------------------
+  - id: hallucinated-package
+    name: An AI-suggested package does not exist, and an attacker can register that name
+    components: [dependencies]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-1357]
+    countermeasures: [verify-packages-exist]
+
+  - id: typosquatted-package
+    name: A lookalike package name installs malicious code
+    components: [dependencies]
+    severity: high
+    stride: [tampering]
+    cwe: [CWE-1357]
+    countermeasures: [verify-packages-exist, pin-and-lock-dependencies]
+
+  - id: vulnerable-dependency
+    name: A library with a known CVE is used in a reachable code path
+    components: [dependencies]
+    severity: high
+    stride: [elevation-of-privilege, tampering]
+    cwe: [CWE-1395]
+    countermeasures: [scan-and-update-dependencies, pin-and-lock-dependencies]
+
+  # ---- Containers and infrastructure -----------------------------------------
+  - id: container-runs-as-root
+    name: The container runs as root, so an app flaw becomes host-level access
+    components: [container-and-iac]
+    severity: medium
+    stride: [elevation-of-privilege]
+    cwe: [CWE-250]
+    countermeasures: [non-root-minimal-images]
+
+  - id: secrets-baked-into-image
+    name: Secrets are copied into the image or passed as build arguments
+    components: [container-and-iac, secrets-and-config]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-540]
+    countermeasures: [secrets-manager]
+
+  - id: overbroad-cloud-permissions
+    name: Cloud roles or service accounts allow far more than the app needs
+    components: [container-and-iac]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-269]
+    countermeasures: [least-privilege-iam]
+
+  - id: exposed-data-store
+    name: A database, cache, or admin port is reachable from the internet
+    components: [container-and-iac, database]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-668]
+    countermeasures: [private-network-for-data-stores]
+
+  # ---- Logging and error handling --------------------------------------------
+  - id: verbose-errors
+    name: Stack traces and internal details are shown to users
+    components: [logging-and-errors, web-endpoint]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-209]
+    countermeasures: [generic-error-messages]
+
+  - id: secrets-in-logs
+    name: Passwords, tokens, or personal data are written to logs
+    components: [logging-and-errors]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-532]
+    countermeasures: [log-without-secrets]
+
+  - id: no-security-logging
+    name: Logins and access failures are not logged, so attacks go unnoticed
+    components: [logging-and-errors, authentication]
+    severity: low
+    stride: [repudiation]
+    cwe: [CWE-778]
+    countermeasures: [log-security-events]
+
+  # ---- LLM calls -------------------------------------------------------------
+  - id: prompt-injection
+    name: Text from users or documents overrides your instructions to the model
+    components: [llm-integration]
+    severity: high
+    stride: [tampering, elevation-of-privilege]
+    cwe: []
+    countermeasures: [treat-model-input-as-untrusted, validate-model-output]
+
+  - id: unsafe-model-output
+    name: Model output is run as SQL, shell, or HTML without checks
+    components: [llm-integration]
+    severity: high
+    stride: [tampering, elevation-of-privilege]
+    cwe: [CWE-74]
+    countermeasures: [validate-model-output]
+
+  - id: sensitive-data-sent-to-model
+    name: Secrets or personal data are sent to a third-party model
+    components: [llm-integration]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-201]
+    countermeasures: [minimize-data-sent-to-model]
+
+  - id: model-cost-abuse
+    name: Unbounded prompts or loops run up model costs
+    components: [llm-integration, agent-tools]
+    severity: medium
+    stride: [denial-of-service]
+    cwe: [CWE-770]
+    countermeasures: [token-budgets, rate-limiting]
+
+  # ---- AI agent with tools ---------------------------------------------------
+  - id: excessive-agent-permissions
+    name: The agent can run commands, read files, or call APIs far beyond its task
+    components: [agent-tools]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-250]
+    countermeasures: [least-privilege-agent-tools, human-approval-for-risky-actions]
+
+  - id: indirect-prompt-injection
+    name: A web page, file, or tool result contains instructions the agent follows
+    components: [agent-tools, llm-integration]
+    severity: high
+    stride: [tampering, elevation-of-privilege]
+    cwe: []
+    countermeasures: [treat-model-input-as-untrusted, human-approval-for-risky-actions]
+
+  - id: agent-data-exfiltration
+    name: The agent is steered into sending secrets or code to an attacker through a tool
+    components: [agent-tools]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-201]
+    countermeasures: [restrict-agent-outbound, keep-secrets-out-of-agent-reach]
+
+  - id: untrusted-mcp-server
+    name: An unpinned or unreviewed MCP server runs attacker-controlled code
+    components: [agent-tools, coding-agent-setup]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-829]
+    countermeasures: [pin-and-review-mcp-servers]
+
+  # ---- Coding agent configuration --------------------------------------------
+  - id: malicious-agent-extension
+    name: A third-party skill, plugin, or hook hides instructions or runs harmful commands
+    components: [coding-agent-setup]
+    severity: high
+    stride: [elevation-of-privilege, tampering]
+    cwe: [CWE-829]
+    countermeasures: [review-agent-extensions]
+
+  - id: broad-agent-permission-rules
+    name: Allow-rules like "run any shell command" remove the safety prompt
+    components: [coding-agent-setup]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-250]
+    countermeasures: [narrow-agent-permission-rules, human-approval-for-risky-actions]
+
+  - id: agent-reads-secrets
+    name: The coding agent can read .env files, SSH keys, or cloud credentials
+    components: [coding-agent-setup, secrets-and-config]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-200]
+    countermeasures: [keep-secrets-out-of-agent-reach]
