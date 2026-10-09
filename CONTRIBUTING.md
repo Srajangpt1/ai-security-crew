@@ -7,8 +7,8 @@ Thank you for your interest in contributing to AI Security Crew! This document p
 1. Make sure you have Python 3.10+ installed
 1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
 1. Fork the repository
-1. Clone your fork: `git clone https://github.com/YOUR-USERNAME/ai_security_crew.git`
-1. Add the upstream remote: `git remote add upstream https://github.com/Srajangpt1/ai_security_crew.git`
+1. Clone your fork: `git clone https://github.com/YOUR-USERNAME/ai-security-crew.git`
+1. Add the upstream remote: `git remote add upstream https://github.com/Srajangpt1/ai-security-crew.git`
 1. Install dependencies:
 
     ```sh
