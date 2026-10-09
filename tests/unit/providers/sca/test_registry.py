@@ -175,6 +175,10 @@ class TestPackageRegistry:
         assert result.exists is False
         assert result.error is not None
         assert "Unsupported ecosystem" in result.error
+        error = result.to_dict()["error"]
+        assert error["code"] == "unsupported_ecosystem"
+        assert "pypi" in error["hint"]
+        assert "issue" not in result.to_dict()
 
     @pytest.mark.asyncio
     async def test_verify_packages_batch(

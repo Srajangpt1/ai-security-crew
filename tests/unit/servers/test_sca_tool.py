@@ -64,3 +64,44 @@ async def test_clean_scan() -> None:
 async def test_code_snippets_argument_is_gone() -> None:
     with pytest.raises(Exception):  # noqa: B017
         await scan([], code_snippets="x")
+
+
+async def call_tool(tool: str, **args: Any) -> dict[str, Any]:
+    async with Client(main_mcp) as client:
+        result = await client.call_tool(tool, args)
+    items = result if isinstance(result, list) else result.content
+    return json.loads(items[0].text)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tool", ["sca_scan_dependencies", "sca_verify_packages"])
+async def test_bad_json_returns_shared_error_with_example(tool: str) -> None:
+    data = await call_tool(tool, packages_json="not json")
+    assert data["success"] is False
+    assert data["error"]["code"] == "invalid_json"
+    assert '"ecosystem": "pypi"' in data["error"]["hint"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("tool", ["sca_scan_dependencies", "sca_verify_packages"])
+async def test_wrong_shape_returns_invalid_packages(tool: str) -> None:
+    data = await call_tool(tool, packages_json='["requests"]')
+    assert data["error"]["code"] == "invalid_packages"
+
+
+@pytest.mark.anyio
+async def test_scan_failure_has_code_and_hint() -> None:
+    data = await scan(
+        [
+            ScanResult(
+                "pyjwt",
+                "2.4.0",
+                "pypi",
+                error="OSV API error: 403",
+                error_code="osv_unavailable",
+            )
+        ]
+    )
+    error = data["errors"][0]["error"]
+    assert error["code"] == "osv_unavailable"
+    assert error["hint"]
