@@ -6,7 +6,7 @@
 A lightweight MCP server for security reviews built for vibe coding — injects security requirements prior to code generation, scans dependencies for CVEs, and verifies generated code, all without breaking your coding rhythm.
 
 **Jump to installation:**
-- [MCP Server](#quick-start) — full feature set with CVE scanning (with reachability) and threat modeling
+- [MCP Server](#quick-start) — full feature set with CVE scanning and threat modeling
 - [Claude Code Plugin](#claude-code-plugin) — install 3 security skills globally in Claude Code (no MCP server needed)
 - [Claude Code Skills only](#claude-code-skills) — manually add slash commands to a specific project
 
@@ -48,7 +48,7 @@ If you prefer to add the skills to a specific project only (instead of globally)
 | Tool | When to Use |
 |------|-------------|
 | `verify_packages` | When adding packages — confirm they exist with valid versions (catches hallucinated package names) |
-| `scan_dependencies` | When adding packages — scan for CVEs and check reachability in your code |
+| `scan_dependencies` | When adding packages — scan for CVEs; the agent checks reachability in your code |
 
 ### Post-coding
 | Tool | When to Use |
@@ -71,17 +71,7 @@ The server automatically sends workflow instructions to any connecting agent (Cl
 
 ## Dependency Scanning
 
-`scan_dependencies` uses [OSV.dev](https://osv.dev) to find CVEs and performs reachability analysis to determine if vulnerable code paths are actually called:
-
-| Status | Meaning |
-|--------|---------|
-| `reachable` | Vulnerable function is called in your code — action required |
-| `not_reachable` | Vulnerable function is not called |
-| `not_imported` | Package is not imported at all |
-| `uncertain` | AI analyzed the code but could not determine reachability |
-| `no_code_provided` | No code snippets were passed to the tool |
-
-Reachability is determined by (in order): OSV function-level symbols → keyword matching against the vuln summary → AI analysis via `ctx.sample()`.
+`scan_dependencies` uses [OSV.dev](https://osv.dev) to find CVEs. No code is sent to the tool. Each finding carries a `reachability_check`: the affected symbols OSV lists (or `no_symbol_data`), the fixed version, and a question. Your coding agent answers it by reading its own code, and upgrades when the symbols are used or it cannot tell.
 
 ## Quick Start
 

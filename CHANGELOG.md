@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — the agent judges reachability, not the server
+- `scan_dependencies` no longer takes `code_snippets` and no longer decides reachability. The regex import and call matching, the keyword matching against advisory text, and the `ctx.sample()` call are removed. Each vulnerability now returns a `reachability_check` (affected symbols from OSV, or `no_symbol_data`, a question, and the fixed version) that the calling agent answers by reading its own code. Vulnerabilities also list `fixed_versions`. This keeps code out of tool calls and works with clients that do not support sampling
+
 ### Changed — code review no longer sends the code through the tool
 - `verify_code_security` no longer needs the code. The checklist depends only on the components, so the `code` argument is now optional, deprecated, and ignored, and the response no longer repeats the code (it used to return it twice). The agent reviews the code already in its context against the returned checklist. This keeps large changes from being pasted into the tool call and echoed back
 

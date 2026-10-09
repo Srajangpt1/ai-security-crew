@@ -34,9 +34,9 @@ This file provides guidance for autonomous coding agents working inside the **AI
 Run both steps before writing code that uses the new packages:
 
 1. **Verify packages exist** — call `sca_verify_packages`. Fix any invalid packages before proceeding.
-2. **Scan for vulnerabilities** — call `sca_scan_dependencies` in parallel with `general_verify_code_security`, passing the packages and code snippets where they are used. Act on results:
-   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing
-   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway
+2. **Scan for vulnerabilities** — call `sca_scan_dependencies` in parallel with `general_verify_code_security`, passing the packages. Each finding has a `reachability_check` (affected symbols and a question). Answer it from your own code and act:
+   - symbols are used, or you cannot tell → upgrade to the fixed version or avoid the symbol before continuing
+   - symbols are not used → note it and continue; consider upgrading anyway
 
 Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects (`"pypi"` or `"npm"`).
 
