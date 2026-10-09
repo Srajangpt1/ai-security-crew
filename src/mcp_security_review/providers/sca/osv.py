@@ -64,6 +64,13 @@ class Vulnerability:
                     "behavior described."
                 ),
             }
+        check["answer_with"] = (
+            "verdict (reachable | not_reachable | uncertain), confidence "
+            "(high | medium | low), and evidence (file:line of each use, or "
+            "what you searched). Say not_reachable with high confidence only "
+            "after searching the whole project for imports, aliases and "
+            "dynamic use of the package; otherwise say uncertain."
+        )
         if self.fixed_versions:
             check["if_unsure"] = (
                 f"Upgrade to {self.fixed_versions[0]} or later."

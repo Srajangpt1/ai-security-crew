@@ -47,6 +47,7 @@ class TestVulnerability:
         check = result["reachability_check"]
         assert check["symbols"] == [{"name": "decode", "module": "jwt"}]
         assert "2.6.0" in check["if_unsure"]
+        assert "confidence" in check["answer_with"]
         assert result["fixed_versions"] == ["2.6.0"]
 
     def test_check_without_symbols(self) -> None:
