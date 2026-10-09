@@ -10,10 +10,20 @@ from dataclasses import dataclass, field
 import httpx
 from thefuzz import fuzz, process
 
+from mcp_security_review.errors import error_body
+
 logger = logging.getLogger(__name__)
 
 PYPI_BASE_URL = "https://pypi.org/pypi"
 NPM_BASE_URL = "https://registry.npmjs.org"
+
+_ERROR_HINTS = {
+    "unsupported_ecosystem": "Use 'pypi' or 'npm' as the ecosystem.",
+    "registry_unavailable": (
+        "The registry could not be reached, so this package is not confirmed "
+        "missing. Retry, or tell the user it could not be verified."
+    ),
+}
 
 # Well-known packages for fuzzy matching fallback
 _COMMON_PYPI_PACKAGES = [
@@ -143,6 +153,7 @@ class PackageVerification:
     correct_version: str | None = None
     latest_version: str | None = None
     error: str | None = None
+    error_code: str | None = None
 
     def is_valid(self) -> bool:
         return self.exists and self.version_exists
@@ -154,7 +165,15 @@ class PackageVerification:
             "ecosystem": self.ecosystem,
             "valid": self.is_valid(),
         }
-        if not self.is_valid():
+        if self.error:
+            result["error"] = error_body(
+                self.error_code or "verification_failed",
+                self.error,
+                _ERROR_HINTS.get(
+                    self.error_code or "", "Retry, or tell the user it could not run."
+                ),
+            )
+        elif not self.is_valid():
             if not self.exists:
                 result["issue"] = "package_not_found"
             elif not self.version_exists:
@@ -167,8 +186,6 @@ class PackageVerification:
                 result["correct_version"] = self.correct_version
             if self.latest_version:
                 result["latest_version"] = self.latest_version
-        if self.error:
-            result["error"] = self.error
         return result
 
 
@@ -195,6 +212,7 @@ class PackageRegistry:
                 exists=False,
                 version_exists=False,
                 error=f"Unsupported ecosystem: {ecosystem}",
+                error_code="unsupported_ecosystem",
             )
 
     async def verify_packages(self, packages: list[dict]) -> list[PackageVerification]:
@@ -231,6 +249,7 @@ class PackageRegistry:
                 exists=False,
                 version_exists=False,
                 error=f"Unsupported ecosystem: {ecosystem}",
+                error_code="unsupported_ecosystem",
             )
 
     async def _verify_pypi(self, name: str, version: str) -> PackageVerification:
@@ -299,6 +318,7 @@ class PackageRegistry:
                 exists=False,
                 version_exists=False,
                 error=f"Registry lookup failed: {e}",
+                error_code="registry_unavailable",
             )
 
     async def _verify_npm(self, name: str, version: str) -> PackageVerification:
@@ -366,6 +386,7 @@ class PackageRegistry:
                 exists=False,
                 version_exists=False,
                 error=f"Registry lookup failed: {e}",
+                error_code="registry_unavailable",
             )
 
     def _suggest_pypi_name(self, name: str) -> str | None:

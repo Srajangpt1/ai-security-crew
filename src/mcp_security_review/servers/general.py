@@ -8,6 +8,7 @@ from typing import Annotated
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from mcp_security_review.errors import error_body
 from mcp_security_review.library import (
     SENSITIVE_DATA_TYPES,
     LibraryError,
@@ -341,7 +342,11 @@ async def verify_code_security(
         fallback_response = {
             "success": False,
             "review_type": "ai_powered_security_review",
-            "error": error_message,
+            "error": error_body(
+                "review_context_failed",
+                error_message,
+                "Review the code against the fallback checklist instead.",
+            ),
             "instructions": (
                 "Context building failed, but you should still review the code. "
                 "Perform a general security review for common vulnerabilities."

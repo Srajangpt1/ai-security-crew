@@ -12,6 +12,7 @@ from typing import Annotated, Any
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from mcp_security_review.errors import error_body, tool_error
 from mcp_security_review.library import (
     SENSITIVE_DATA_TYPES,
     LibraryError,
@@ -303,7 +304,11 @@ async def perform_threat_model(
         # Return template anyway so agent can still attempt the analysis
         fallback_response: dict[str, Any] = {
             "success": False,
-            "error": error_message,
+            "error": error_body(
+                "threat_model_failed",
+                error_message,
+                "Build the threat model from the template and the description.",
+            ),
             "template": ThreatModelTemplate.get_template_structure(),
             "feature": {
                 "title": title,
@@ -434,43 +439,23 @@ async def update_threat_model_file(
 
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON in threat_model_json: {e}")
-        return json.dumps(
-            {
-                "success": False,
-                "error": f"Invalid JSON: {e}",
-                "message": (
-                    "The threat model data is not valid JSON. Ensure it "
-                    "follows the ThreatModelOutput structure."
-                ),
-            },
-            indent=2,
-            ensure_ascii=False,
+        return tool_error(
+            "invalid_json",
+            f"threat_model_json is not valid JSON: {e}",
+            "Pass the ThreatModelOutput structure from perform_threat_model as a "
+            "JSON object.",
         )
     except OSError as e:
         logger.error(f"Failed to write threat model file: {e}")
-        return json.dumps(
-            {
-                "success": False,
-                "error": f"File write error: {e}",
-                "message": (
-                    f"Could not write to {file_path}. Check that the "
-                    "directory exists and is writable."
-                ),
-            },
-            indent=2,
-            ensure_ascii=False,
+        return tool_error(
+            "file_write_failed",
+            f"Could not write to {file_path}: {e}",
+            "Check that the directory exists and is writable.",
         )
     except (ValueError, KeyError, TypeError) as e:
         logger.error(f"Failed to parse threat model data: {e}")
-        return json.dumps(
-            {
-                "success": False,
-                "error": str(e),
-                "message": (
-                    "Failed to parse the threat model data. Ensure it "
-                    "matches the expected structure from perform_threat_model."
-                ),
-            },
-            indent=2,
-            ensure_ascii=False,
+        return tool_error(
+            "invalid_threat_model",
+            f"The threat model data does not match the expected structure: {e}",
+            "Match the structure returned by perform_threat_model.",
         )

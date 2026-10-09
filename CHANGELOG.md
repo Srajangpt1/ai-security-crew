@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed — one error shape for every tool
+- Failures now return `{"success": false, "error": {"code", "message", "hint"}}`, with the same fields in every tool, so the agent can branch on `code` and follow `hint`. `error` used to be a plain string in some tools.
+- Bad `packages_json` returns `invalid_json` or `invalid_packages` with an example of the expected input.
+- `verify_packages` no longer reports a package as `package_not_found` when the registry could not be reached or the ecosystem is unsupported. Those come back as `registry_unavailable` or `unsupported_ecosystem`, which are not the same as invalid.
+- `scan_dependencies` and `verify_packages` list per-package failures under `errors`.
+
 ### Changed — the agent judges reachability, not the server
 - `scan_dependencies` no longer takes `code_snippets` and no longer decides reachability. The regex import and call matching, the keyword matching against advisory text, and the `ctx.sample()` call are removed. Each vulnerability now returns a `reachability_check` (affected symbols from OSV, or `no_symbol_data`, a question, and the fixed version) that the calling agent answers by reading its own code. Vulnerabilities also list `fixed_versions`. This keeps code out of tool calls and works with clients that do not support sampling
 

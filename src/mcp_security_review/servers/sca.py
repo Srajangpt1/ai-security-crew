@@ -11,9 +11,34 @@ from typing import Annotated
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
+from mcp_security_review.errors import tool_error
 from mcp_security_review.providers.sca import OSVScanner, PackageRegistry
 
 logger = logging.getLogger(__name__)
+
+_PACKAGES_EXAMPLE = '[{"name": "requests", "version": "2.31.0", "ecosystem": "pypi"}]'
+
+
+def _parse_packages(packages_json: str) -> list[dict] | str:
+    """Parse the packages argument, or return the JSON error to send back."""
+    try:
+        packages = json.loads(packages_json)
+    except json.JSONDecodeError as e:
+        return tool_error(
+            "invalid_json",
+            f"packages_json is not valid JSON: {e}",
+            f"Pass a JSON array, for example {_PACKAGES_EXAMPLE}",
+        )
+    if not isinstance(packages, list) or not all(
+        isinstance(p, dict) and p.get("name") and p.get("version") for p in packages
+    ):
+        return tool_error(
+            "invalid_packages",
+            "packages_json must be a JSON array of objects with name and version.",
+            f"Pass a JSON array, for example {_PACKAGES_EXAMPLE}",
+        )
+    return packages
+
 
 sca_mcp = FastMCP(
     name="SCA MCP Service",
@@ -58,21 +83,31 @@ async def verify_packages(
         If all packages are valid, returns {"all_valid": true}.
         If any are invalid, returns details and suggested fixes.
     """
-    try:
-        packages = json.loads(packages_json)
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON: {e}"}, indent=2)
-
-    if not isinstance(packages, list):
-        return json.dumps(
-            {"error": "Expected a JSON array of package objects"},
-            indent=2,
-        )
+    packages = _parse_packages(packages_json)
+    if isinstance(packages, str):
+        return packages
 
     registry = PackageRegistry()
     results = await registry.verify_packages(packages)
 
-    invalid = [r for r in results if not r.is_valid()]
+    failed = [r for r in results if r.error]
+    invalid = [r for r in results if not r.is_valid() and not r.error]
+
+    if failed:
+        return json.dumps(
+            {
+                "all_valid": False,
+                "packages_checked": len(results),
+                "invalid_packages": [r.to_dict() for r in invalid],
+                "errors": [r.to_dict() for r in failed],
+                "action_required": (
+                    "Some packages could not be verified, which is not the same "
+                    "as invalid. Follow each error's hint."
+                ),
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     if not invalid:
         return json.dumps(
@@ -132,16 +167,9 @@ async def scan_dependencies(
         JSON with scan results per package: vulnerabilities, severity,
         affected and fixed versions, and the reachability check.
     """
-    try:
-        packages = json.loads(packages_json)
-    except json.JSONDecodeError as e:
-        return json.dumps({"error": f"Invalid JSON for packages: {e}"}, indent=2)
-
-    if not isinstance(packages, list):
-        return json.dumps(
-            {"error": "Expected a JSON array of package objects"},
-            indent=2,
-        )
+    packages = _parse_packages(packages_json)
+    if isinstance(packages, str):
+        return packages
 
     scanner = OSVScanner()
     results = await scanner.scan_packages(packages)
@@ -155,9 +183,7 @@ async def scan_dependencies(
 
     failed = [r for r in results if r.error]
     if failed:
-        response["errors"] = [
-            {"name": r.name, "version": r.version, "error": r.error} for r in failed
-        ]
+        response["errors"] = [r.to_dict() for r in failed]
 
     if not vulnerable_results:
         if failed:

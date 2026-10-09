@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 
 import httpx
 
+from mcp_security_review.errors import error_body
+
 logger = logging.getLogger(__name__)
 
 OSV_API_URL = "https://api.osv.dev/v1"
@@ -108,6 +110,7 @@ class ScanResult:
     ecosystem: str
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
     error: str | None = None
+    error_code: str | None = None
 
     @property
     def has_vulnerabilities(self) -> bool:
@@ -124,7 +127,11 @@ class ScanResult:
             result["vulnerability_count"] = len(self.vulnerabilities)
             result["vulnerabilities"] = [v.to_dict() for v in self.vulnerabilities]
         if self.error:
-            result["error"] = self.error
+            result["error"] = error_body(
+                self.error_code or "scan_failed",
+                self.error,
+                "Retry the scan, or tell the user it could not run.",
+            )
         return result
 
 
@@ -197,6 +204,7 @@ class OSVScanner:
                 version=version,
                 ecosystem=ecosystem,
                 error=f"OSV API error: {e}",
+                error_code="osv_unavailable",
             )
 
         return ScanResult(

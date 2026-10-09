@@ -132,7 +132,8 @@ async def test_unknown_component_lists_valid_ids() -> None:
     data = await call(task_description="x", components="file-upload,teleporter")
 
     assert data["success"] is False
-    assert "teleporter" in data["error"]
+    assert data["error"]["code"] == "unknown_component"
+    assert "teleporter" in data["error"]["message"]
     assert "file-upload" in data["valid_components"]
 
 
@@ -191,5 +192,5 @@ async def test_invalid_project_library_returns_a_clear_error(tmp_path: Path) -> 
     data = await call(task_description="x", project_root=str(tmp_path))
 
     assert data["success"] is False
-    assert "invalid" in data["error"]
+    assert data["error"]["code"] == "invalid_library"
     assert data["details"]
