@@ -50,10 +50,10 @@ Select all applicable categories from this list:
 
 For each identified security category, provide:
 - Specific threats relevant to the task
-- OWASP-aligned mitigation recommendations
+- Mitigation recommendations
 - Code-level guidance (what to do / what to avoid)
 
-Base guidelines on these OWASP principles:
+Base guidelines on these principles:
 
 **Authentication:**
 - Use bcrypt/argon2 for password hashing (never MD5/SHA1)

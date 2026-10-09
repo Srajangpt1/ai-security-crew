@@ -57,7 +57,7 @@ Select all applicable:
 - `cloud_security` — IAM, S3 permissions, VPC, security groups
 - `supply_chain_security` — dependencies, lockfiles
 
-### Step 4 — Apply OWASP Guidelines
+### Step 4 — Apply Security Guidelines
 
 For each identified category, provide specific, actionable guidance:
 
