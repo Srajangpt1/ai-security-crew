@@ -1,12 +1,13 @@
-"""OSV.dev vulnerability scanner with reachability analysis.
+"""OSV.dev vulnerability scanner.
 
-Queries the OSV.dev API for known vulnerabilities and checks
-whether vulnerable functions are reachable in the provided code.
+Queries the OSV.dev API for known vulnerabilities. Each vulnerability
+carries a reachability check (affected symbols plus a question) that the
+calling agent answers by reading its own code; the server does not
+decide reachability.
 """
 
 import asyncio
 import logging
-import re
 from dataclasses import dataclass, field
 
 import httpx
@@ -31,41 +32,6 @@ class VulnerableFunction:
         return result
 
 
-class ReachabilityStatus:
-    """Reachability determination status values."""
-
-    REACHABLE = "reachable"
-    NOT_REACHABLE = "not_reachable"
-    NOT_IMPORTED = "not_imported"
-    AI_ANALYSIS_REQUIRED = "ai_analysis_required"
-    NO_CODE_PROVIDED = "no_code_provided"
-    UNCERTAIN = "uncertain"  # AI analyzed but could not definitively determine
-
-
-@dataclass
-class ReachabilityResult:
-    """Result of checking if a vulnerable function is reachable."""
-
-    status: str  # one of ReachabilityStatus values
-    evidence: str | None = None
-    function: VulnerableFunction | None = None
-    reachability_prompt: str | None = None  # set when AI analysis is needed
-
-    @property
-    def reachable(self) -> bool:
-        return self.status == ReachabilityStatus.REACHABLE
-
-    def to_dict(self) -> dict:
-        result: dict = {"status": self.status}
-        if self.function:
-            result["function"] = self.function.to_dict()
-        if self.evidence:
-            result["evidence"] = self.evidence
-        if self.reachability_prompt:
-            result["reachability_prompt"] = self.reachability_prompt
-        return result
-
-
 @dataclass
 class Vulnerability:
     """A vulnerability found for a package."""
@@ -75,8 +41,47 @@ class Vulnerability:
     severity: str
     affected_versions: list[str] = field(default_factory=list)
     vulnerable_functions: list[VulnerableFunction] = field(default_factory=list)
+    fixed_versions: list[str] = field(default_factory=list)
     references: list[str] = field(default_factory=list)
-    reachability: list[ReachabilityResult] = field(default_factory=list)
+
+    def reachability_check(self) -> dict:
+        """Build the question the calling agent answers about its own code."""
+        if self.vulnerable_functions:
+            check: dict = {
+                "symbols": [f.to_dict() for f in self.vulnerable_functions],
+                "question": (
+                    "Does the code call or import any of these symbols? "
+                    "If none are used, the vulnerable code path is likely "
+                    "not reached."
+                ),
+            }
+        else:
+            check = {
+                "symbols": "no_symbol_data",
+                "question": (
+                    "OSV lists no affected symbols. Read the summary and "
+                    "references and judge whether the code uses the "
+                    "behavior described."
+                ),
+            }
+        check["answer_with"] = (
+            "verdict (reachable | not_reachable | uncertain), confidence "
+            "(high | medium | low), and evidence (file:line of each use, or "
+            "what you searched). Say not_reachable with high confidence only "
+            "after searching the whole project for imports, aliases and "
+            "dynamic use of the package; otherwise say uncertain."
+        )
+        if self.fixed_versions:
+            check["if_unsure"] = (
+                f"Upgrade to {self.fixed_versions[0]} or later."
+                if len(self.fixed_versions) == 1
+                else "Upgrade to a fixed version: "
+                + ", ".join(self.fixed_versions)
+                + "."
+            )
+        else:
+            check["if_unsure"] = "No fixed version listed; avoid the affected API."
+        return check
 
     def to_dict(self) -> dict:
         result: dict = {
@@ -86,33 +91,11 @@ class Vulnerability:
         }
         if self.affected_versions:
             result["affected_versions"] = self.affected_versions
-        if self.vulnerable_functions:
-            result["vulnerable_functions"] = [
-                f.to_dict() for f in self.vulnerable_functions
-            ]
+        if self.fixed_versions:
+            result["fixed_versions"] = self.fixed_versions
         if self.references:
             result["references"] = self.references
-        if self.reachability:
-            result["reachability"] = [r.to_dict() for r in self.reachability]
-            statuses = [r.status for r in self.reachability]
-            result["reachability_summary"] = (
-                ReachabilityStatus.REACHABLE
-                if ReachabilityStatus.REACHABLE in statuses
-                else (
-                    ReachabilityStatus.NOT_REACHABLE
-                    if all(
-                        s
-                        in (
-                            ReachabilityStatus.NOT_REACHABLE,
-                            ReachabilityStatus.NOT_IMPORTED,
-                        )
-                        for s in statuses
-                    )
-                    else statuses[0]
-                    if len(set(statuses)) == 1
-                    else "mixed"
-                )
-            )
+        result["reachability_check"] = self.reachability_check()
         return result
 
 
@@ -130,25 +113,6 @@ class ScanResult:
     def has_vulnerabilities(self) -> bool:
         return len(self.vulnerabilities) > 0
 
-    @property
-    def has_reachable_vulnerabilities(self) -> bool:
-        return any(
-            any(r.reachable for r in v.reachability)
-            for v in self.vulnerabilities
-            if v.reachability
-        )
-
-    @property
-    def needs_ai_analysis(self) -> bool:
-        return any(
-            any(
-                r.status == ReachabilityStatus.AI_ANALYSIS_REQUIRED
-                for r in v.reachability
-            )
-            for v in self.vulnerabilities
-            if v.reachability
-        )
-
     def to_dict(self) -> dict:
         result: dict = {
             "name": self.name,
@@ -159,9 +123,6 @@ class ScanResult:
         if self.vulnerabilities:
             result["vulnerability_count"] = len(self.vulnerabilities)
             result["vulnerabilities"] = [v.to_dict() for v in self.vulnerabilities]
-            if any(v.reachability for v in self.vulnerabilities):
-                result["reachable"] = self.has_reachable_vulnerabilities
-                result["needs_ai_reachability_analysis"] = self.needs_ai_analysis
         if self.error:
             result["error"] = self.error
         return result
@@ -199,34 +160,27 @@ class OSVScanner:
         name: str,
         version: str,
         ecosystem: str,
-        code_snippets: list[str] | None = None,
     ) -> ScanResult:
         """Scan a single package for vulnerabilities."""
         results = await self.scan_packages(
-            [{"name": name, "version": version, "ecosystem": ecosystem}],
-            code_snippets,
+            [{"name": name, "version": version, "ecosystem": ecosystem}]
         )
         return results[0]
 
-    async def scan_packages(
-        self,
-        packages: list[dict],
-        code_snippets: list[str] | None = None,
-    ) -> list[ScanResult]:
+    async def scan_packages(self, packages: list[dict]) -> list[ScanResult]:
         """Scan multiple packages for vulnerabilities in parallel.
 
         Fires one /v1/query POST per package concurrently — each
         returns full vulnerability data so no hydration step needed.
         """
         async with httpx.AsyncClient(timeout=self._timeout) as client:
-            tasks = [self._scan_one(client, pkg, code_snippets) for pkg in packages]
+            tasks = [self._scan_one(client, pkg) for pkg in packages]
             return list(await asyncio.gather(*tasks))
 
     async def _scan_one(
         self,
         client: httpx.AsyncClient,
         pkg: dict,
-        code_snippets: list[str] | None,
     ) -> ScanResult:
         """Scan a single package using the /v1/query endpoint."""
         name = pkg.get("name", "")
@@ -244,17 +198,6 @@ class OSVScanner:
                 ecosystem=ecosystem,
                 error=f"OSV API error: {e}",
             )
-
-        if vulns:
-            combined_code = "\n".join(code_snippets) if code_snippets else ""
-            for vuln in vulns:
-                vuln.reachability = self._determine_reachability(
-                    vuln,
-                    name,
-                    osv_eco,
-                    combined_code,
-                    has_code=bool(code_snippets),
-                )
 
         return ScanResult(
             name=name,
@@ -289,6 +232,7 @@ class OSVScanner:
             severity = self._extract_severity(vuln_data)
             affected_versions = self._extract_affected_versions(vuln_data)
             vulnerable_functions = self._extract_vulnerable_functions(vuln_data)
+            fixed_versions = self._extract_fixed_versions(vuln_data)
             references = self._extract_references(vuln_data)
 
             vulnerabilities.append(
@@ -298,6 +242,7 @@ class OSVScanner:
                     severity=severity,
                     affected_versions=affected_versions,
                     vulnerable_functions=vulnerable_functions,
+                    fixed_versions=fixed_versions,
                     references=references,
                 )
             )
@@ -366,6 +311,17 @@ class OSVScanner:
                     versions.append(f">={introduced}")
         return versions
 
+    def _extract_fixed_versions(self, vuln_data: dict) -> list[str]:
+        """Extract versions in which the vulnerability is fixed."""
+        fixed: list[str] = []
+        for affected in vuln_data.get("affected", []):
+            for rng in affected.get("ranges", []):
+                for event in rng.get("events", []):
+                    version = event.get("fixed")
+                    if version and version not in fixed:
+                        fixed.append(version)
+        return fixed
+
     def _extract_vulnerable_functions(
         self, vuln_data: dict
     ) -> list[VulnerableFunction]:
@@ -413,259 +369,3 @@ class OSVScanner:
             if url:
                 refs.append(url)
         return refs[:5]  # Limit to 5 references
-
-    def _determine_reachability(
-        self,
-        vuln: "Vulnerability",
-        package_name: str,
-        ecosystem: str,
-        code: str,
-        *,
-        has_code: bool = True,
-    ) -> list[ReachabilityResult]:
-        """Determine reachability for a vulnerability.
-
-        Decision tree:
-        1. No code provided → no_code_provided
-        2. Package not imported → not_imported
-        3. OSV has function symbols → static check → reachable/not_reachable
-        4. No function symbols → keyword check → reachable or ai_analysis_required
-        """
-        if not has_code:
-            return [
-                ReachabilityResult(
-                    status=ReachabilityStatus.NO_CODE_PROVIDED,
-                    evidence=(
-                        "No code snippets provided. Pass code_snippets "
-                        "to enable reachability analysis."
-                    ),
-                )
-            ]
-
-        # Step 1: Is the package imported at all?
-        # Collect alternative import names from vuln module data
-        # (e.g. pyjwt package is imported as "jwt")
-        alt_names = {
-            vf.module.split(".")[0]
-            for vf in vuln.vulnerable_functions
-            if vf.module and vf.module.split(".")[0] != package_name
-        }
-        imported, import_evidence = self._is_package_imported(
-            package_name, ecosystem, code, alt_names
-        )
-        if not imported:
-            return [
-                ReachabilityResult(
-                    status=ReachabilityStatus.NOT_IMPORTED,
-                    evidence=import_evidence,
-                )
-            ]
-
-        # Step 2: OSV gave us specific function symbols — do static check
-        if vuln.vulnerable_functions:
-            results = []
-            for vfunc in vuln.vulnerable_functions:
-                reachable, evidence = self._is_function_called(
-                    vfunc, code, package_name, ecosystem
-                )
-                results.append(
-                    ReachabilityResult(
-                        status=(
-                            ReachabilityStatus.REACHABLE
-                            if reachable
-                            else ReachabilityStatus.NOT_REACHABLE
-                        ),
-                        function=vfunc,
-                        evidence=evidence or import_evidence,
-                    )
-                )
-            return results
-
-        # Step 3: No function symbols — try keyword match, then ask AI
-        keyword_match = self._keyword_match(vuln.summary, code)
-        if keyword_match:
-            return [
-                ReachabilityResult(
-                    status=ReachabilityStatus.REACHABLE,
-                    evidence=(
-                        f"Keyword match in code: '{keyword_match}' "
-                        f"(from vuln summary). {import_evidence}"
-                    ),
-                )
-            ]
-
-        # Step 4: Package is imported, no function data, no keyword match
-        # → hand off to AI agent with a structured prompt
-        prompt = self._build_ai_reachability_prompt(
-            vuln, package_name, code, import_evidence or ""
-        )
-        return [
-            ReachabilityResult(
-                status=ReachabilityStatus.AI_ANALYSIS_REQUIRED,
-                evidence=(
-                    f"{package_name} is imported but OSV has no "
-                    f"function-level data for {vuln.id}. "
-                    "AI analysis required to determine reachability."
-                ),
-                reachability_prompt=prompt,
-            )
-        ]
-
-    def _is_package_imported(
-        self,
-        package_name: str,
-        ecosystem: str,
-        code: str,
-        alt_names: set[str] | None = None,
-    ) -> tuple[bool, str | None]:
-        """Check if a package is imported anywhere in the code.
-
-        alt_names: alternative import names (e.g. pyjwt -> {"jwt"}).
-        """
-        names_to_check = [package_name] + list(alt_names or set())
-
-        if ecosystem == "PyPI":
-            for name in names_to_check:
-                patterns = [
-                    rf"^import\s+{re.escape(name)}\b",
-                    rf"^from\s+{re.escape(name)}\b",
-                ]
-                for p in patterns:
-                    m = re.search(p, code, re.MULTILINE | re.IGNORECASE)
-                    if m:
-                        return True, f"Imported: {m.group().strip()}"
-            return False, f"'{package_name}' not found in any import statement"
-
-        elif ecosystem == "npm":
-            for name in names_to_check:
-                pkg = re.escape(name)
-                patterns = [
-                    rf"""require\s*\(\s*['\"]{pkg}['\\"]\s*\)""",
-                    rf"""from\s+['\"]{pkg}['\"]""",
-                ]
-                for p in patterns:
-                    m = re.search(p, code)
-                    if m:
-                        return True, f"Imported: {m.group().strip()}"
-            return False, f"'{package_name}' not found in any import/require"
-
-        else:
-            for name in names_to_check:
-                if re.search(re.escape(name), code, re.IGNORECASE):
-                    return True, f"'{name}' referenced in code"
-            return False, f"'{package_name}' not referenced in code"
-
-    def _is_function_called(
-        self,
-        vfunc: VulnerableFunction,
-        code: str,
-        package_name: str,
-        ecosystem: str,
-    ) -> tuple[bool, str | None]:
-        """Check if a specific vulnerable function is called in code."""
-        func_name = vfunc.name
-        module = vfunc.module
-
-        # Also check the module's top-level name for import matching
-        # (e.g. pyjwt's module is "jwt")
-        names_to_check = [package_name]
-        if module:
-            top = module.split(".")[0]
-            if top != package_name:
-                names_to_check.append(top)
-
-        if ecosystem == "PyPI":
-            # from X import func_name
-            m = re.search(
-                rf"from\s+\S+\s+import\s+[^;\n]*\b{re.escape(func_name)}\b",
-                code,
-                re.MULTILINE,
-            )
-            if m:
-                return True, f"Imported directly: {m.group().strip()}"
-
-            # obj.func_name( or func_name(
-            m = re.search(
-                rf"\b\w*\.?{re.escape(func_name)}\s*\(",
-                code,
-            )
-            if m:
-                return True, f"Called: {m.group().strip()}"
-
-            return (
-                False,
-                f"'{func_name}' not directly called "
-                f"(package '{package_name}' is imported)",
-            )
-
-        elif ecosystem == "npm":
-            m = re.search(rf"\.{re.escape(func_name)}\s*\(", code)
-            if m:
-                return True, f"Called: {m.group().strip()}"
-            m = re.search(rf"\b{re.escape(func_name)}\s*\(", code)
-            if m:
-                return True, f"Called: {m.group().strip()}"
-            return (
-                False,
-                f"'{func_name}' not directly called "
-                f"(package '{package_name}' is imported)",
-            )
-
-        else:
-            if re.search(r"\b" + re.escape(func_name) + r"\b", code):
-                return True, f"'{func_name}' found in code"
-            return False, None
-
-    def _keyword_match(self, summary: str, code: str) -> str | None:
-        """Extract API/class names from vuln summary and search code.
-
-        Looks for CamelCase identifiers, snake_case function names,
-        and quoted terms mentioned in the advisory summary.
-        """
-        candidates: list[str] = []
-
-        # Quoted terms: 'FileResponse', ``yaml.load``, "xmlattr"
-        candidates += re.findall(r"[`'\"]([A-Za-z][\w.]+)[`'\"]", summary)
-
-        # CamelCase class names: FileResponse, MultiPartParser
-        candidates += re.findall(r"\b([A-Z][a-z]+(?:[A-Z][a-z]+)+)\b", summary)
-
-        # snake_case function calls mentioned: yaml.load, safe_load
-        candidates += re.findall(r"\b([a-z_]+\.[a-z_]+)\b", summary)
-
-        for candidate in candidates:
-            if len(candidate) < 4:
-                continue
-            if re.search(re.escape(candidate), code):
-                return candidate
-
-        return None
-
-    def _build_ai_reachability_prompt(
-        self,
-        vuln: "Vulnerability",
-        package_name: str,
-        code: str,
-        import_evidence: str,
-    ) -> str:
-        """Build a structured prompt for the AI agent to assess reachability."""
-        # Trim code to avoid huge prompts
-        code_preview = code[:2000] + ("..." if len(code) > 2000 else "")
-        return (
-            f"## Reachability Analysis Required\n\n"
-            f"**Vulnerability**: {vuln.id}\n"
-            f"**Package**: {package_name}\n"
-            f"**Summary**: {vuln.summary}\n"
-            f"**Severity**: {vuln.severity}\n"
-            f"**Affected versions**: "
-            f"{', '.join(vuln.affected_versions) or 'see references'}\n"
-            f"**Import evidence**: {import_evidence}\n\n"
-            f"OSV does not provide function-level data for this vulnerability.\n"
-            f"Based on the vulnerability description above, determine whether\n"
-            f"the code below triggers the vulnerable behavior:\n\n"
-            f"```\n{code_preview}\n```\n\n"
-            f"Answer:\n"
-            f"- Is the vulnerable behavior triggered? (yes / no / uncertain)\n"
-            f"- What specific code pattern causes or avoids it?\n"
-            f"- Recommended action if reachable."
-        )

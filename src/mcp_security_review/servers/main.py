@@ -116,9 +116,9 @@ AGENT_INSTRUCTIONS = (
     "## 2. When adding or updating dependencies\n"
     "Run both steps before writing any code that uses the new packages:\n"
     "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
-    "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs and checks reachability. Act on results:\n"  # noqa: E501
-    "   - `reachable` or `uncertain` → upgrade or avoid the vulnerable function before continuing.\n"  # noqa: E501
-    "   - `not_reachable` / `not_imported` → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
+    "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs. Each finding has a `reachability_check`; answer it from your own code:\n"  # noqa: E501
+    "   - affected symbols are used, or you cannot tell → upgrade to the fixed version or avoid the symbol before continuing.\n"  # noqa: E501
+    "   - symbols are not used → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
     "## 3. After generating code\n"
     "Call `general_verify_code_security` with the same `components`. Do not paste code: it returns a checklist, and you review the code you wrote against it.\n"  # noqa: E501
     "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501

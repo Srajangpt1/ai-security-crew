@@ -1,4 +1,4 @@
-"""Tests for OSV vulnerability scanner and reachability analysis."""
+"""Tests for the OSV vulnerability scanner and reachability checks."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -7,8 +7,6 @@ import pytest
 
 from mcp_security_review.providers.sca.osv import (
     OSVScanner,
-    ReachabilityResult,
-    ReachabilityStatus,
     ScanResult,
     Vulnerability,
     VulnerableFunction,
@@ -37,24 +35,26 @@ class TestVulnerability:
         assert result["severity"] == "high"
         assert "vulnerable_functions" not in result
 
-    def test_to_dict_with_reachability(self) -> None:
-        vf = VulnerableFunction(name="decode", module="jwt")
+    def test_check_with_symbols(self) -> None:
         vuln = Vulnerability(
             id="CVE-2023-1234",
             summary="Test",
             severity="high",
-            vulnerable_functions=[vf],
-            reachability=[
-                ReachabilityResult(
-                    status=ReachabilityStatus.REACHABLE,
-                    function=vf,
-                    evidence="Function referenced: jwt.decode(",
-                )
-            ],
+            vulnerable_functions=[VulnerableFunction(name="decode", module="jwt")],
+            fixed_versions=["2.6.0"],
         )
         result = vuln.to_dict()
-        assert result["reachability_summary"] == ReachabilityStatus.REACHABLE
-        assert len(result["reachability"]) == 1
+        check = result["reachability_check"]
+        assert check["symbols"] == [{"name": "decode", "module": "jwt"}]
+        assert "2.6.0" in check["if_unsure"]
+        assert "confidence" in check["answer_with"]
+        assert result["fixed_versions"] == ["2.6.0"]
+
+    def test_check_without_symbols(self) -> None:
+        vuln = Vulnerability(id="CVE-1", summary="Test", severity="low")
+        check = vuln.to_dict()["reachability_check"]
+        assert check["symbols"] == "no_symbol_data"
+        assert "No fixed version" in check["if_unsure"]
 
 
 class TestScanResult:
@@ -169,18 +169,13 @@ class TestOSVScanner:
             assert vuln.vulnerable_functions[0].module == "jwt"
 
     @pytest.mark.asyncio
-    async def test_scan_with_reachability(
+    async def test_scan_returns_reachability_check(
         self, scanner: OSVScanner, mock_osv_response_with_vulns: dict
     ) -> None:
         mock_resp = AsyncMock(spec=httpx.Response)
         mock_resp.status_code = 200
         mock_resp.json.return_value = mock_osv_response_with_vulns
         mock_resp.raise_for_status = lambda: None
-
-        code = """
-import jwt
-token = jwt.decode(encoded, key, algorithms=['HS256'])
-"""
 
         with patch("httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
@@ -189,43 +184,11 @@ token = jwt.decode(encoded, key, algorithms=['HS256'])
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client_cls.return_value = mock_client
 
-            result = await scanner.scan_package(
-                "pyjwt", "2.4.0", "pypi", code_snippets=[code]
-            )
-            assert result.has_vulnerabilities
+            result = await scanner.scan_package("pyjwt", "2.4.0", "pypi")
             vuln = result.vulnerabilities[0]
-            assert len(vuln.reachability) == 1
-            assert vuln.reachability[0].status == ReachabilityStatus.REACHABLE
-            assert "decode" in (vuln.reachability[0].evidence or "")
-
-    @pytest.mark.asyncio
-    async def test_scan_not_reachable(
-        self, scanner: OSVScanner, mock_osv_response_with_vulns: dict
-    ) -> None:
-        mock_resp = AsyncMock(spec=httpx.Response)
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = mock_osv_response_with_vulns
-        mock_resp.raise_for_status = lambda: None
-
-        code = """
-import jwt
-token = jwt.encode(payload, key, algorithm='HS256')
-"""
-
-        with patch("httpx.AsyncClient") as mock_client_cls:
-            mock_client = AsyncMock()
-            mock_client.post.return_value = mock_resp
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client_cls.return_value = mock_client
-
-            result = await scanner.scan_package(
-                "pyjwt", "2.4.0", "pypi", code_snippets=[code]
-            )
-            vuln = result.vulnerabilities[0]
-            assert len(vuln.reachability) == 1
-            # decode is not called, only encode
-            assert vuln.reachability[0].status == ReachabilityStatus.NOT_REACHABLE
+            assert vuln.fixed_versions == ["2.6.0"]
+            check = result.to_dict()["vulnerabilities"][0]["reachability_check"]
+            assert check["symbols"] == [{"name": "decode", "module": "jwt"}]
 
     @pytest.mark.asyncio
     async def test_scan_batch(
@@ -284,6 +247,15 @@ token = jwt.encode(payload, key, algorithm='HS256')
         versions = scanner._extract_affected_versions(vuln_data)
         assert ">=0,<2.6.0" in versions
 
+    def test_extract_fixed_versions(self, scanner: OSVScanner) -> None:
+        vuln_data = {
+            "affected": [
+                {"ranges": [{"events": [{"introduced": "0"}, {"fixed": "2.6.0"}]}]},
+                {"ranges": [{"events": [{"introduced": "3.0"}, {"fixed": "3.1.0"}]}]},
+            ]
+        }
+        assert scanner._extract_fixed_versions(vuln_data) == ["2.6.0", "3.1.0"]
+
     def test_extract_vulnerable_functions_pypi(self, scanner: OSVScanner) -> None:
         vuln_data = {
             "affected": [
@@ -312,111 +284,3 @@ token = jwt.encode(payload, key, algorithm='HS256')
         assert len(funcs) == 1
         assert funcs[0].name == "template"
         assert funcs[0].module == "lodash"
-
-
-class TestReachabilityAnalysis:
-    """Test the reachability checking logic."""
-
-    @pytest.fixture
-    def scanner(self) -> OSVScanner:
-        return OSVScanner()
-
-    def _make_vuln(
-        self, functions: list[VulnerableFunction] | None = None
-    ) -> Vulnerability:
-        return Vulnerability(
-            id="TEST-001",
-            summary="Test vulnerability in decode function",
-            severity="high",
-            vulnerable_functions=functions or [],
-        )
-
-    def test_no_code_provided(self, scanner: OSVScanner) -> None:
-        vuln = self._make_vuln()
-        results = scanner._determine_reachability(
-            vuln, "jwt", "PyPI", "", has_code=False
-        )
-        assert len(results) == 1
-        assert results[0].status == ReachabilityStatus.NO_CODE_PROVIDED
-
-    def test_package_not_imported(self, scanner: OSVScanner) -> None:
-        code = "import requests\nresp = requests.get('https://example.com')"
-        vuln = self._make_vuln()
-        results = scanner._determine_reachability(
-            vuln, "jwt", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.NOT_IMPORTED
-
-    def test_python_function_reachable(self, scanner: OSVScanner) -> None:
-        code = "import jwt\ntoken = jwt.decode(encoded, key, algorithms=['HS256'])"
-        vf = VulnerableFunction(name="decode", module="jwt")
-        vuln = self._make_vuln([vf])
-        results = scanner._determine_reachability(
-            vuln, "jwt", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.REACHABLE
-        assert "decode" in (results[0].evidence or "")
-
-    def test_python_from_import_reachable(self, scanner: OSVScanner) -> None:
-        code = "from jwt import decode\nresult = decode(token, key)"
-        vf = VulnerableFunction(name="decode", module="jwt")
-        vuln = self._make_vuln([vf])
-        results = scanner._determine_reachability(
-            vuln, "jwt", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.REACHABLE
-
-    def test_python_imported_but_not_called(self, scanner: OSVScanner) -> None:
-        code = "import jwt\ntoken = jwt.encode(payload, key)"
-        vf = VulnerableFunction(name="decode", module="jwt")
-        vuln = self._make_vuln([vf])
-        results = scanner._determine_reachability(
-            vuln, "jwt", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.NOT_REACHABLE
-        assert "not directly called" in (results[0].evidence or "")
-
-    def test_js_reachable(self, scanner: OSVScanner) -> None:
-        code = "const _ = require('lodash');\nconst result = _.template(input);"
-        vf = VulnerableFunction(name="template", module="lodash")
-        vuln = self._make_vuln([vf])
-        results = scanner._determine_reachability(
-            vuln, "lodash", "npm", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.REACHABLE
-
-    def test_js_not_imported(self, scanner: OSVScanner) -> None:
-        code = "const fs = require('fs');\nfs.readFileSync('file.txt');"
-        vf = VulnerableFunction(name="template", module="lodash")
-        vuln = self._make_vuln([vf])
-        results = scanner._determine_reachability(
-            vuln, "lodash", "npm", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.NOT_IMPORTED
-
-    def test_ai_analysis_required_when_no_function_data(
-        self, scanner: OSVScanner
-    ) -> None:
-        """When OSV has no function symbols and no keyword match, AI prompt is returned."""
-        code = "from starlette.responses import JSONResponse\nreturn JSONResponse({'ok': True})"
-        vuln = self._make_vuln()  # no vulnerable_functions
-        vuln.summary = "Starlette DoS via some obscure internal mechanism"
-        results = scanner._determine_reachability(
-            vuln, "starlette", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.AI_ANALYSIS_REQUIRED
-        assert results[0].reachability_prompt is not None
-        assert "starlette" in (results[0].reachability_prompt or "").lower()
-
-    def test_keyword_match_triggers_reachable(self, scanner: OSVScanner) -> None:
-        """If vuln summary mentions 'FileResponse' and code uses it, flag reachable."""
-        code = "from starlette.responses import FileResponse\nreturn FileResponse('file.txt')"
-        vuln = self._make_vuln()
-        vuln.summary = (
-            "Starlette vulnerable to DoS via FileResponse Range header merging"
-        )
-        results = scanner._determine_reachability(
-            vuln, "starlette", "PyPI", code, has_code=True
-        )
-        assert results[0].status == ReachabilityStatus.REACHABLE
-        assert "FileResponse" in (results[0].evidence or "")
