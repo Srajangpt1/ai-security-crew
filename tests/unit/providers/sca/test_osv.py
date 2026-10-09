@@ -420,3 +420,115 @@ class TestReachabilityAnalysis:
         )
         assert results[0].status == ReachabilityStatus.REACHABLE
         assert "FileResponse" in (results[0].evidence or "")
+
+
+class TestDynamicImportDetection:
+    """Test detection of dynamic import patterns."""
+
+    @pytest.fixture
+    def scanner(self) -> OSVScanner:
+        return OSVScanner()
+
+    def _make_vuln(self, functions: list[VulnerableFunction] | None = None) -> Vulnerability:
+        return Vulnerability(
+            id="TEST-DYN-001",
+            summary="Test vulnerability",
+            severity="high",
+            vulnerable_functions=functions or [],
+        )
+
+    # ------ Python dynamic imports ------
+    def test_importlib_import_module_detected(self, scanner: OSVScanner) -> None:
+        code = "import importlib\nmod = importlib.import_module('pyjwt')"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "pyjwt", "PyPI", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+        assert "DYNAMIC" in (results[0].evidence or "")
+        assert results[0].reachability_prompt is not None
+
+    def test_dunder_import_detected(self, scanner: OSVScanner) -> None:
+        code = "mod = __import__('requests')"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "requests", "PyPI", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_importlib_variable_flagged(self, scanner: OSVScanner) -> None:
+        code = "import importlib\npkg_name = get_pkg()\nmod = importlib.import_module(pkg_name)"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "pyjwt", "PyPI", code, has_code=True
+        )
+        # Cannot confirm specific package but dynamic pattern detected
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_exec_with_package_name_flagged(self, scanner: OSVScanner) -> None:
+        code = "exec(\"import pyjwt; pyjwt.decode(token, key)\")"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "pyjwt", "PyPI", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_static_import_still_works_with_dynamic_present(
+        self, scanner: OSVScanner
+    ) -> None:
+        """Static import takes priority over dynamic import detection."""
+        code = "import jwt\ntoken = jwt.decode(t, k, algorithms=['HS256'])"
+        vf = VulnerableFunction(name="decode", module="jwt")
+        vuln = self._make_vuln([vf])
+        results = scanner._determine_reachability(
+            vuln, "pyjwt", "PyPI", code, has_code=True
+        )
+        # Static import found first — should be REACHABLE, not DYNAMIC_IMPORT
+        assert results[0].status == ReachabilityStatus.REACHABLE
+
+    # ------ JS dynamic imports ------
+    def test_js_dynamic_import_detected(self, scanner: OSVScanner) -> None:
+        code = "const mod = await import('lodash');"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "lodash", "npm", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_js_require_resolve_detected(self, scanner: OSVScanner) -> None:
+        code = "const path = require.resolve('lodash');"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "lodash", "npm", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_js_require_variable_flagged(self, scanner: OSVScanner) -> None:
+        code = "const pkgName = getPkg();\nconst mod = require(pkgName);"
+        vuln = self._make_vuln()
+        results = scanner._determine_reachability(
+            vuln, "lodash", "npm", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.DYNAMIC_IMPORT
+
+    def test_js_static_import_not_dynamic(self, scanner: OSVScanner) -> None:
+        """Static require() with a literal string should NOT be flagged as dynamic."""
+        code = "const _ = require('lodash');\n_.template(input);"
+        vf = VulnerableFunction(name="template", module="lodash")
+        vuln = self._make_vuln([vf])
+        results = scanner._determine_reachability(
+            vuln, "lodash", "npm", code, has_code=True
+        )
+        assert results[0].status == ReachabilityStatus.REACHABLE
+
+    # ------ find_dynamic_import directly ------
+    def test_find_dynamic_returns_none_when_absent(self, scanner: OSVScanner) -> None:
+        code = "import requests\nresp = requests.get('https://example.com')"
+        result = scanner._find_dynamic_import("requests", "PyPI", code, set())
+        assert result is None
+
+    def test_find_dynamic_import_module_with_string(self, scanner: OSVScanner) -> None:
+        code = "importlib.import_module('yaml')"
+        result = scanner._find_dynamic_import("yaml", "PyPI", code, set())
+        assert result is not None
+        assert "DYNAMIC" in result

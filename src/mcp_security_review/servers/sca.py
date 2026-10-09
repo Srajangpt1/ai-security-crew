@@ -12,7 +12,13 @@ from typing import Annotated
 from fastmcp import Context, FastMCP
 from pydantic import Field
 
-from mcp_security_review.providers.sca import OSVScanner, PackageRegistry
+from mcp_security_review.providers.sca import (
+    EnvironmentContext,
+    EnvMarkerEvaluator,
+    LockfileParser,
+    OSVScanner,
+    PackageRegistry,
+)
 from mcp_security_review.providers.sca.osv import ReachabilityStatus, ScanResult
 
 logger = logging.getLogger(__name__)
@@ -36,7 +42,11 @@ async def _resolve_ai_reachability(ctx: Context, results: list[ScanResult]) -> N
         for vuln in scan_result.vulnerabilities:
             for reach in vuln.reachability:
                 if (
-                    reach.status == ReachabilityStatus.AI_ANALYSIS_REQUIRED
+                    reach.status
+                    in (
+                        ReachabilityStatus.AI_ANALYSIS_REQUIRED,
+                        ReachabilityStatus.DYNAMIC_IMPORT,
+                    )
                     and reach.reachability_prompt
                 ):
                     try:
@@ -261,6 +271,224 @@ async def scan_dependencies(
             "Provide code snippets where these packages are used "
             "to enable reachability analysis and determine if "
             "vulnerable functions are actually called."
+        )
+
+    return json.dumps(response, indent=2, ensure_ascii=False)
+
+
+@sca_mcp.tool(tags={"security", "sca", "lockfile", "runtime"})
+async def scan_lockfile(
+    ctx: Context,
+    lockfile_content: Annotated[
+        str,
+        Field(
+            description=(
+                "Content of the lockfile to parse and scan. Supported formats: "
+                "requirements.txt, uv.lock, poetry.lock, package-lock.json, "
+                "yarn.lock, Pipfile.lock."
+            )
+        ),
+    ],
+    lockfile_name: Annotated[
+        str,
+        Field(
+            description=(
+                "Filename of the lockfile (e.g. 'requirements.txt', 'uv.lock'). "
+                "Used to detect format."
+            ),
+            default="requirements.txt",
+        ),
+    ] = "requirements.txt",
+    target_python_version: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Target Python version to evaluate environment markers against, "
+                "e.g. '3.11'. Defaults to current interpreter version. "
+                "Use this to simulate what's installed in a container."
+            ),
+            default=None,
+        ),
+    ] = None,
+    target_platform: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Target sys.platform for marker evaluation, e.g. 'linux', 'win32', "
+                "'darwin'. Defaults to current platform."
+            ),
+            default=None,
+        ),
+    ] = None,
+    extras: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Comma-separated list of package extras to activate when evaluating "
+                "optional dependency markers, e.g. 'security,async'."
+            ),
+            default=None,
+        ),
+    ] = None,
+    code_snippets: Annotated[
+        str | None,
+        Field(
+            description=(
+                "Optional JSON array of code snippet strings to enable reachability "
+                "analysis on vulnerable packages found in the lockfile."
+            ),
+            default=None,
+        ),
+    ] = None,
+) -> str:
+    """Scan a lockfile to find CVEs in the *actual* resolved dependency graph.
+
+    Addresses the static vs runtime analysis gap by:
+    1. Parsing the lockfile to get all *resolved* packages (direct + transitive)
+    2. Evaluating PEP 508 environment markers to filter deps inactive in the
+       target environment (e.g. Windows-only deps on a Linux container)
+    3. Flagging packages installed from non-registry sources (git, path, URL)
+       which may diverge from the published version at runtime
+    4. Scanning all active packages against OSV.dev for known CVEs
+    5. Optionally running reachability analysis if code snippets are provided
+
+    Use this tool when you need to audit what's *actually loaded at runtime*
+    rather than just what's declared in pyproject.toml or package.json.
+
+    Args:
+        ctx: The FastMCP context.
+        lockfile_content: Raw content of the lockfile.
+        lockfile_name: Filename hint for format detection.
+        target_python_version: Python version to evaluate markers against.
+        target_platform: sys.platform for marker evaluation.
+        extras: Comma-separated extras to activate.
+        code_snippets: Optional JSON array of code for reachability analysis.
+
+    Returns:
+        JSON with:
+        - Lockfile format detected
+        - Total/active/skipped package counts
+        - Packages skipped due to inactive env markers
+        - Non-registry sources flagged (potential drift)
+        - CVE findings with reachability status
+    """
+    # Parse lockfile
+    parse_result = LockfileParser.parse(lockfile_content, lockfile_name)
+
+    if not parse_result.dependencies:
+        return json.dumps(
+            {
+                "format": parse_result.format.value,
+                "error": "No pinned packages found in lockfile",
+                "warnings": parse_result.warnings,
+            },
+            indent=2,
+        )
+
+    # Build environment context for marker evaluation
+    if target_python_version or target_platform:
+        env = EnvironmentContext.for_container(
+            python_version=target_python_version or "3.11",
+            sys_platform=target_platform or "linux",
+        )
+    else:
+        env = EnvironmentContext()
+
+    if extras:
+        env.extras = [e.strip() for e in extras.split(",") if e.strip()]
+
+    # Evaluate markers to get the runtime-active subset
+    evaluator = EnvMarkerEvaluator()
+    active_deps, skipped_reasons = evaluator.filter_active(
+        parse_result.dependencies, env
+    )
+
+    # Collect non-registry sources (potential drift points)
+    drift_warnings = [
+        f"{dep.name}@{dep.version}: non-registry source — {dep.source}"
+        for dep in active_deps
+        if dep.source
+    ]
+
+    # Prepare packages for OSV scanning
+    packages_to_scan = [
+        {"name": dep.name, "version": dep.version, "ecosystem": dep.ecosystem}
+        for dep in active_deps
+    ]
+
+    # Parse code snippets
+    snippets = None
+    if code_snippets:
+        try:
+            snippets = json.loads(code_snippets)
+            if not isinstance(snippets, list):
+                snippets = [str(snippets)]
+        except json.JSONDecodeError:
+            snippets = [code_snippets]
+
+    # Scan all active packages
+    scanner = OSVScanner()
+    scan_results = await scanner.scan_packages(packages_to_scan, snippets)
+
+    if snippets:
+        await _resolve_ai_reachability(ctx, scan_results)
+
+    vulnerable = [r for r in scan_results if r.has_vulnerabilities]
+    reachable = [r for r in scan_results if r.has_reachable_vulnerabilities]
+
+    response: dict = {
+        "lockfile_format": parse_result.format.value,
+        "total_packages_in_lockfile": len(parse_result.dependencies),
+        "direct_packages": parse_result.direct_count,
+        "transitive_packages": parse_result.transitive_count,
+        "active_after_marker_eval": len(active_deps),
+        "skipped_by_markers": len(skipped_reasons),
+        "non_registry_sources": len(drift_warnings),
+        "packages_scanned": len(scan_results),
+        "vulnerable_count": len(vulnerable),
+    }
+
+    if parse_result.warnings:
+        response["lockfile_warnings"] = parse_result.warnings
+
+    if skipped_reasons:
+        response["marker_filtered_deps"] = skipped_reasons
+
+    if drift_warnings:
+        response["runtime_drift_risk"] = drift_warnings
+        response["drift_warning"] = (
+            "These packages are installed from non-registry sources (git, path, URL). "
+            "The resolved version at build time may differ from what's running in "
+            "production. Verify these match your expected versions."
+        )
+
+    if not vulnerable:
+        response["status"] = "clean"
+        response["message"] = (
+            f"No known vulnerabilities in {len(active_deps)} active packages "
+            f"(from {len(parse_result.dependencies)} total in lockfile)."
+        )
+        return json.dumps(response, indent=2, ensure_ascii=False)
+
+    response["status"] = "vulnerabilities_found"
+    response["results"] = [r.to_dict() for r in vulnerable]
+
+    if snippets:
+        response["reachable_count"] = len(reachable)
+        if reachable:
+            response["action_required"] = (
+                "URGENT: Vulnerable functions are reachable in your code. "
+                "Upgrade the affected packages immediately."
+            )
+        else:
+            response["recommendation"] = (
+                "Vulnerabilities found but not directly reachable in the provided "
+                "code. Upgrade as a precaution, especially transitive dependencies."
+            )
+    else:
+        response["recommendation"] = (
+            "Provide code_snippets to enable reachability analysis and determine "
+            "which of these CVEs are actually exploitable in your codebase."
         )
 
     return json.dumps(response, indent=2, ensure_ascii=False)

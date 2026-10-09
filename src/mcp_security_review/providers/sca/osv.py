@@ -40,6 +40,8 @@ class ReachabilityStatus:
     AI_ANALYSIS_REQUIRED = "ai_analysis_required"
     NO_CODE_PROVIDED = "no_code_provided"
     UNCERTAIN = "uncertain"  # AI analyzed but could not definitively determine
+    # Package loaded via dynamic import — static analysis cannot confirm
+    DYNAMIC_IMPORT = "dynamic_import"
 
 
 @dataclass
@@ -461,6 +463,23 @@ class OSVScanner:
                 )
             ]
 
+        # If import was detected via a dynamic pattern, flag it and ask AI
+        if import_evidence and import_evidence.startswith("DYNAMIC:"):
+            prompt = self._build_ai_reachability_prompt(
+                vuln, package_name, code, import_evidence
+            )
+            return [
+                ReachabilityResult(
+                    status=ReachabilityStatus.DYNAMIC_IMPORT,
+                    evidence=(
+                        f"{package_name} appears to be loaded dynamically — "
+                        "static analysis cannot confirm reachability. "
+                        f"{import_evidence}"
+                    ),
+                    reachability_prompt=prompt,
+                )
+            ]
+
         # Step 2: OSV gave us specific function symbols — do static check
         if vuln.vulnerable_functions:
             results = []
@@ -521,6 +540,10 @@ class OSVScanner:
         """Check if a package is imported anywhere in the code.
 
         alt_names: alternative import names (e.g. pyjwt -> {"jwt"}).
+
+        Also detects dynamic imports (importlib, __import__, require() with
+        variable arg) and returns a sentinel evidence string so the caller
+        can flag the result as DYNAMIC_IMPORT status.
         """
         names_to_check = [package_name] + list(alt_names or set())
 
@@ -534,6 +557,14 @@ class OSVScanner:
                     m = re.search(p, code, re.MULTILINE | re.IGNORECASE)
                     if m:
                         return True, f"Imported: {m.group().strip()}"
+
+            # Dynamic import patterns for Python
+            dyn_evidence = self._find_dynamic_import(
+                package_name, ecosystem, code, alt_names
+            )
+            if dyn_evidence:
+                return True, dyn_evidence
+
             return False, f"'{package_name}' not found in any import statement"
 
         elif ecosystem == "npm":
@@ -547,6 +578,14 @@ class OSVScanner:
                     m = re.search(p, code)
                     if m:
                         return True, f"Imported: {m.group().strip()}"
+
+            # Dynamic import patterns for JS/TS
+            dyn_evidence = self._find_dynamic_import(
+                package_name, ecosystem, code, alt_names
+            )
+            if dyn_evidence:
+                return True, dyn_evidence
+
             return False, f"'{package_name}' not found in any import/require"
 
         else:
@@ -554,6 +593,99 @@ class OSVScanner:
                 if re.search(re.escape(name), code, re.IGNORECASE):
                     return True, f"'{name}' referenced in code"
             return False, f"'{package_name}' not referenced in code"
+
+    def _find_dynamic_import(
+        self,
+        package_name: str,
+        ecosystem: str,
+        code: str,
+        alt_names: set[str] | None = None,
+    ) -> str | None:
+        """Detect dynamic import patterns that static regex misses.
+
+        Returns an evidence string prefixed with 'DYNAMIC:' if found,
+        None otherwise.
+
+        Python patterns detected:
+        - importlib.import_module("pkg") / importlib.import_module('pkg')
+        - __import__("pkg")
+        - importlib.import_module(variable)  — flagged as uncertain
+        - exec()/eval() calls  — flagged as uncertain if package name nearby
+
+        JS/TS patterns detected:
+        - import("pkg")  dynamic import()
+        - require(variable)  — flagged as uncertain
+        - require.resolve("pkg")
+        - await import("pkg")
+        """
+        names_to_check = [package_name] + list(alt_names or set())
+
+        if ecosystem == "PyPI":
+            for name in names_to_check:
+                pkg = re.escape(name)
+                # importlib.import_module("pkg") or importlib.import_module('pkg')
+                m = re.search(
+                    rf"""importlib\.import_module\s*\(\s*['\"]{pkg}['\"]""",
+                    code,
+                )
+                if m:
+                    matched = m.group().strip()
+                    return f"DYNAMIC: importlib.import_module('{name}') — {matched}"
+
+                # __import__("pkg")
+                m = re.search(
+                    rf"""__import__\s*\(\s*['\"]{pkg}['\"]""",
+                    code,
+                )
+                if m:
+                    return f"DYNAMIC: __import__('{name}') — {m.group().strip()}"
+
+            # Generic dynamic load indicators (uncertain — no specific package name)
+            # importlib.import_module(variable) where variable might contain our pkg
+            if re.search(r"importlib\.import_module\s*\(\s*[^'\"]", code):
+                return (
+                    f"DYNAMIC: importlib.import_module(variable) detected — "
+                    f"cannot confirm if '{package_name}' is loaded dynamically"
+                )
+            # exec/eval with package name appearing in the expression
+            for name in names_to_check:
+                m = re.search(
+                    rf"""(?:exec|eval)\s*\([\s\S]{{0,500}}?\b{re.escape(name)}\b""",
+                    code,
+                )
+                if m:
+                    return (
+                        f"DYNAMIC: exec/eval with '{name}' reference — "
+                        f"package may be loaded dynamically"
+                    )
+
+        elif ecosystem == "npm":
+            for name in names_to_check:
+                pkg = re.escape(name)
+                # Dynamic import(): import("pkg") or await import("pkg")
+                m = re.search(
+                    rf"""import\s*\(\s*['\"]{pkg}['\"]""",
+                    code,
+                )
+                if m:
+                    return f"DYNAMIC: import('{name}') — {m.group().strip()}"
+
+                # require.resolve("pkg")
+                m = re.search(
+                    rf"""require\.resolve\s*\(\s*['\"]{pkg}['\"]""",
+                    code,
+                )
+                if m:
+                    return f"DYNAMIC: require.resolve('{name}') — {m.group().strip()}"
+
+            # require(variable) — uncertain
+            if re.search(r"require\s*\(\s*[^'\"`]", code):
+                return (
+                    f"DYNAMIC: require(variable) detected — "
+                    f"cannot confirm if '{package_name}' is loaded dynamically"
+                )
+
+        return None
 
     def _is_function_called(
         self,
