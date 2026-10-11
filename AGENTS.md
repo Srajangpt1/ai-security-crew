@@ -62,6 +62,23 @@ uv run pytest                        # run full test suite
 
 ---
 
+## Claude Code Hook Setup
+
+Automatically triggers a security review on every feature-building prompt — no manual `/sec-review` needed. Run once after cloning:
+
+```bash
+python3 scripts/setup_claude_hook.py
+```
+
+Then restart Claude Code. The hook detects intent, checks if the MCP server is running, and routes to the appropriate security review:
+- **MCP running** → instructs Claude to call `lightweight_security_review` (full integration)
+- **MCP not running** → runs `SecurityAssessment` standalone (150+ OWASP guidelines)
+- **Neither available** → injects inline OWASP reminders + setup guidance
+
+The setup script installs the hook globally into `~/.claude/settings.json`.
+
+---
+
 ## Core MCP patterns
 
 **Tool naming**: `{server}_{tool}` (e.g., `sca_verify_packages`); each sub-server is mounted in `servers/main.py`
