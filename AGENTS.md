@@ -15,6 +15,7 @@ This file provides guidance for autonomous coding agents working inside the **AI
 | `  ├─ servers/` | FastMCP server implementations |
 | `  ├─ library/` | Threat library: components, threats, countermeasures (YAML) |
 | `  ├─ security/` | Code review context and threat modeling |
+| `  ├─ guard/` | Runtime guard for coding agents (`asc-guard`): hook CLI, Jev client, policy |
 | `  └─ utils/` | Shared utilities (env, logging, lifecycle) |
 | `tests/` | Pytest test suite with fixtures |
 | `scripts/` | Guideline and assessment helper scripts |

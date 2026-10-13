@@ -126,6 +126,27 @@ Every failure comes back as `{"success": false, "error": {"code", "message", "hi
 
 `scan_dependencies` uses [OSV.dev](https://osv.dev) to find CVEs. No code is sent to the tool. Each finding carries a `reachability_check`: the affected symbols OSV lists (or `no_symbol_data`), the fixed version, and a question. Your agent answers it by reading its own code, and upgrades when the symbols are used or it cannot tell.
 
+## Runtime guard (`asc-guard`)
+
+The guard watches your coding agent while it works. If the agent is prompt-injected, for example by a web page or file it read, the guard blocks that action and later actions that carry it out.
+
+It runs as a client hook, outside the model, so an injected agent cannot skip it. Before each tool call it asks TypeSafe's [Jev](https://docs.typesafe.ai) decision model four narrow questions (how risky is this, would an engineer want to approve it, did the user ask for it, does it follow instructions planted in content the agent read) and answers allow, ask or deny. After each tool result it checks whether the content tries to instruct the agent, and remembers that for the rest of the session. One rule does not depend on the model: the agent may not edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/mcp.json`, and similar).
+
+```bash
+export TYPESAFE_API_KEY=...      # the guard is off until this is set
+asc-guard install                # adds the hooks to .claude/settings.json (--scope user for all projects)
+```
+
+The plugin also ships `hooks/hooks.json`, which does the same thing through `uvx` once the key is set. `asc-guard check Bash '{"command": "npm test"}'` judges a single call (exit code 0 allow, 1 ask, 2 deny).
+
+Things to know:
+
+- **Data leaves your machine.** Commands, file paths and tool output are sent to TypeSafe for judgment. That is why the guard is opt-in.
+- **If Jev is unreachable,** shell, network and MCP calls ask you first; everything else goes ahead.
+- **Thresholds** are in `src/mcp_security_review/guard/data/policy.yaml` and can be overridden with `ASC_GUARD_<NAME>` variables. They are provisional until the evaluation harness exists.
+- **State** (recent messages, flagged content, audit log) is kept under `~/.ai-security-crew/guard/`.
+- Claude Code only for now.
+
 ## Threat library
 
 `lightweight_security_review` is backed by a built-in library of **25 components**, **88 threats**, and **85 countermeasures** (web and API apps, plus LLM, agent, and MCP features). Threats carry STRIDE and CWE references (and OWASP MCP Top 10 ids for agent and MCP threats), and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids.

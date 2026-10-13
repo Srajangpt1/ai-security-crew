@@ -26,6 +26,7 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 mcp-security-review = "mcp_security_review:main"
+asc-guard = "mcp_security_review.guard.cli:main"
 
 [dependency-groups]
 dev = [

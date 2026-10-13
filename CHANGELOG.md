@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — runtime guard for coding agents
+- New `asc-guard` command with `hook`, `check` and `install`. Claude Code runs it before and after tool calls and when a prompt is submitted. Before a call it asks TypeSafe's Jev model four questions (risk, approval, user requested, from untrusted content) and answers allow, ask or deny. After a tool result it checks whether the content tries to instruct the agent, and remembers that so later calls that act on it are denied.
+- The agent cannot edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/mcp.json` and similar). This rule does not use the model.
+- Off until `TYPESAFE_API_KEY` is set. Questions and thresholds are YAML under `guard/data/`; thresholds can be overridden with `ASC_GUARD_*` variables. If Jev is unreachable, shell, network and MCP calls ask first.
+- The plugin ships `hooks/hooks.json`; `asc-guard install` writes the same hooks into a settings file.
+
 ### Changed — one error shape for every tool
 - Failures now return `{"success": false, "error": {"code", "message", "hint"}}`, with the same fields in every tool, so the agent can branch on `code` and follow `hint`. `error` used to be a plain string in some tools.
 - Bad `packages_json` returns `invalid_json` or `invalid_packages` with an example of the expected input.

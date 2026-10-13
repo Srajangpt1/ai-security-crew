@@ -1,0 +1,12 @@
+# Thresholds for turning Jev's answers into allow, ask or deny.
+# Override any value with the environment variable ASC_GUARD_<NAME>.
+# allow_user_p is provisional (jev-guard uses 0.85): one live test scored a
+# plain "delete the build folder" request at 0.78. Tune it with the evaluation.
+deny_risk: 2.5          # deny at or above this risk score (0 to 3)
+ask_risk: 1.5           # ask at or above this risk score
+ask_approval_p: 0.75    # ask when approval is at least this likely
+deny_untrusted_p: 0.7   # deny when the call follows planted instructions
+allow_user_p: 0.75      # a risky call the user asked for is allowed
+inject_p: 0.6           # flag a tool result as injection at this probability
+low_confidence: 0.7     # below this confidence a risky call becomes ask
+confidence_min_risk: 1.0  # the low-confidence rule applies from this risk up
