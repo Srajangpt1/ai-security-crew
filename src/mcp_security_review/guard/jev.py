@@ -20,8 +20,20 @@ class JevError(RuntimeError):
 class Answers:
     """Typed access to the `answers` map of a Jev response."""
 
-    def __init__(self, answers: dict[str, dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        answers: dict[str, dict[str, Any]],
+        input_tokens: int | None = None,
+        model: str | None = None,
+    ) -> None:
         self._answers = answers
+        self.input_tokens = input_tokens
+        self.model = model
+
+    @property
+    def raw(self) -> dict[str, dict[str, Any]]:
+        """The answers exactly as the API returned them."""
+        return self._answers
 
     def _get(self, name: str) -> dict[str, Any]:
         if name not in self._answers:
@@ -95,9 +107,12 @@ class JevClient:
     @staticmethod
     def _parse(resp: httpx.Response) -> Answers:
         try:
-            answers = resp.json()["answers"]
+            body = resp.json()
+            answers = body["answers"]
         except (ValueError, KeyError, TypeError) as e:
             raise JevError(f"malformed Jev response: {e}") from e
         if not isinstance(answers, dict):
             raise JevError("malformed Jev response: answers is not a map")
-        return Answers(answers)
+        usage = body.get("usage")
+        tokens = usage.get("input_tokens") if isinstance(usage, dict) else None
+        return Answers(answers, tokens, body.get("model"))

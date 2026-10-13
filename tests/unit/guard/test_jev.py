@@ -91,3 +91,17 @@ def test_missing_answer_is_an_error() -> None:
     handler = lambda req: httpx.Response(200, json=OK)  # noqa: E731
     with pytest.raises(JevError, match="missing"):
         client(handler).ask("s", {}).noul("nope")
+
+
+def test_usage_and_model_are_kept() -> None:
+    payload = {**OK, "model": "jev-1.13.0", "usage": {"input_tokens": 292}}
+    handler = lambda req: httpx.Response(200, json=payload)  # noqa: E731
+    answers = client(handler).ask("s", {})
+    assert answers.input_tokens == 292 and answers.model == "jev-1.13.0"
+    assert answers.raw["a"] == {"noul": 0.9}
+
+
+def test_missing_usage_is_none() -> None:
+    handler = lambda req: httpx.Response(200, json=OK)  # noqa: E731
+    answers = client(handler).ask("s", {})
+    assert answers.input_tokens is None and answers.model is None
