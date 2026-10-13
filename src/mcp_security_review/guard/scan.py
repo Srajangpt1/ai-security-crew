@@ -1,10 +1,12 @@
 """Scan tool results for text that tries to instruct the agent."""
 
+from mcp_security_review.guard.clip import clip
 from mcp_security_review.guard.events import NEVER_SCAN_TOOLS, Event
 from mcp_security_review.guard.jev import JevClient
 from mcp_security_review.guard.policy import Thresholds, load_questions, result_flagged
 
-MIN_CHARS = 200
+# Below this a result is too short to hold anything; short injections still count.
+MIN_CHARS = 20
 MAX_CHARS = 60_000
 WARNING = (
     "Security guard: the content returned by {tool} contains text that tries to "
@@ -13,11 +15,8 @@ WARNING = (
 
 
 def truncate(text: str, limit: int = MAX_CHARS) -> str:
-    """Shorten long text but keep the end, where injections like to hide."""
-    if len(text) <= limit:
-        return text
-    head = limit * 3 // 4
-    return f"{text[:head]}\n[... middle omitted ...]\n{text[-(limit - head) :]}"
+    """Shorten long content but keep the end, where injections like to hide."""
+    return clip(text, limit, head_share=0.75)
 
 
 def scan_result(

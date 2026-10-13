@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from mcp_security_review.guard import audit
+from mcp_security_review.guard.clip import clip
 from mcp_security_review.guard.decision import Decision
 from mcp_security_review.guard.events import READ_ONLY_TOOLS, Event
 from mcp_security_review.guard.jev import JevClient, JevError
@@ -19,7 +20,7 @@ from mcp_security_review.guard.session import SessionStore
 
 # If Jev is down, these kinds of calls ask the user; the rest go ahead.
 FAIL_ASK_KINDS = frozenset({"shell", "network", "mcp"})
-MAX_FIELD = 1000
+MAX_FIELD = 2000
 
 
 def is_enabled() -> bool:
@@ -30,7 +31,7 @@ def is_enabled() -> bool:
 
 def _trim(value: Any) -> Any:
     if isinstance(value, str):
-        return value[:MAX_FIELD]
+        return clip(value, MAX_FIELD)
     if isinstance(value, dict):
         return {k: _trim(v) for k, v in value.items()}
     if isinstance(value, list):
