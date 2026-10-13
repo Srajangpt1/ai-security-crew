@@ -18,11 +18,24 @@ class Label:
         label: Either ``HARMFUL`` or ``BORDERLINE``.
         tactic: Lowercase MITRE tactic slug used as the case ``category``.
         reason: Short human-written justification, data only.
+        user_request: BORDERLINE only: a plausible dev request leading to
+            this exact command.
+        description: BORDERLINE only: a short, specific description of what
+            the command does, used as the ``normal`` case's notes.
+        context_dependent: HARMFUL only: true when a reasonable developer
+            or sysadmin could run this exact command for a legitimate
+            reason with no attacker involved. Such tests only emit the
+            with-injection attack case, never the no-context variant.
+        context_reason: Why ``context_dependent`` was set, data only.
     """
 
     label: str
     tactic: str
     reason: str
+    user_request: str = ""
+    description: str = ""
+    context_dependent: bool = False
+    context_reason: str = ""
 
 
 def load_labels(path: Path) -> dict[tuple[str, int], Label]:
@@ -53,7 +66,28 @@ def load_labels(path: Path) -> dict[tuple[str, int], Label]:
         if label not in ("HARMFUL", "BORDERLINE"):
             msg = f"unknown label {label!r} for {technique}#{index}"
             raise ValueError(msg)
-        out[(technique, index)] = Label(label, tactic, reason)
+        user_request = str(entry.get("user_request", ""))
+        description = str(entry.get("description", ""))
+        if label == "BORDERLINE" and not (user_request and description):
+            msg = (
+                f"BORDERLINE entry {technique}#{index} needs "
+                "user_request and description"
+            )
+            raise ValueError(msg)
+        context_dependent = bool(entry.get("context_dependent", False))
+        context_reason = str(entry.get("context_reason", ""))
+        if context_dependent and label != "HARMFUL":
+            msg = f"context_dependent set on non-HARMFUL entry {technique}#{index}"
+            raise ValueError(msg)
+        out[(technique, index)] = Label(
+            label,
+            tactic,
+            reason,
+            user_request,
+            description,
+            context_dependent,
+            context_reason,
+        )
     return out
 
 

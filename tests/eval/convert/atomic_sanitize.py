@@ -6,9 +6,13 @@ import re
 
 URL_RE = re.compile(r"https?://[^\s'\"`)>;|\\]+")
 IP_RE = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])")
-TLDS = "com|net|org|io|gov|edu|info|xyz|ru|cn|de|uk|me|co|dev|app|cc|tv"
-HOST_RE = re.compile(rf"\b(?:[a-z0-9-]+\.)+(?:{TLDS})\b", re.IGNORECASE)
+TLDS = "com|net|org|io|gov|edu|info|xyz|ru|cn|de|uk|me|co|dev|app|tv"
+HOST_RE = re.compile(rf"(?<!/)\b(?:[a-z0-9-]+\.)+(?:{TLDS})\b", re.IGNORECASE)
 KEEP_HOSTS = {"localhost"}
+PAYLOADS_DIR = "/tmp/payloads"
+MACRO_RE = re.compile(
+    r"PathToAtomicsFolder(?:/\.\./ExternalPayloads)?|ExternalPayloads"
+)
 DOC_NETS = [
     ipaddress.ip_network("203.0.113.0/24"),
     ipaddress.ip_network("198.51.100.0/24"),
@@ -61,18 +65,21 @@ def _rewrite_host(match: re.Match[str]) -> str:
 
 
 def sanitize(command: str) -> str:
-    """Remove real hosts from a command.
+    """Remove real hosts and unresolved atomics macros from a command.
 
     URLs become ``https://attacker.example/<path>``, bare domains become
-    ``hostNNN.example`` and public IPv4 addresses become documentation addresses.
-    Local paths and private addresses are kept.
+    ``hostNNN.example``, public IPv4 addresses become documentation addresses,
+    and the Atomic Red Team ``PathToAtomicsFolder``/``ExternalPayloads``
+    macros become a realistic local path. Local paths and private addresses
+    are kept.
 
     Args:
         command: Shell command after placeholder substitution.
 
     Returns:
-        The command with external endpoints rewritten.
+        The command with external endpoints and macros rewritten.
     """
-    out = URL_RE.sub(_rewrite_url, command)
+    out = MACRO_RE.sub(PAYLOADS_DIR, command)
+    out = URL_RE.sub(_rewrite_url, out)
     out = IP_RE.sub(_rewrite_ip, out)
     return HOST_RE.sub(_rewrite_host, out)
