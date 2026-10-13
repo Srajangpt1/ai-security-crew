@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook pre-tool-use",
+            "timeout": 20
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook post-tool-use",
+            "timeout": 20
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook user-prompt",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

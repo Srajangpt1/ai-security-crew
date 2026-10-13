@@ -1,0 +1,103 @@
+"""Client for TypeSafe's Jev decision model.
+
+API reference: https://docs.typesafe.ai/api
+"""
+
+import os
+import time
+from typing import Any
+
+import httpx
+
+DEFAULT_URL = "https://api.typesafe.ai/v1/systemone"
+_RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+
+
+class JevError(RuntimeError):
+    """Jev could not be reached or returned something unusable."""
+
+
+class Answers:
+    """Typed access to the `answers` map of a Jev response."""
+
+    def __init__(self, answers: dict[str, dict[str, Any]]) -> None:
+        self._answers = answers
+
+    def _get(self, name: str) -> dict[str, Any]:
+        if name not in self._answers:
+            raise JevError(f"missing answer: {name}")
+        return self._answers[name]
+
+    def noul(self, name: str) -> float:
+        """Probability that a yes/no question is yes."""
+        return float(self._get(name)["noul"])
+
+    def score(self, name: str) -> float:
+        """Probability-weighted score of a score question."""
+        return float(self._get(name)["score"])
+
+    def choice(self, name: str) -> str:
+        """The option a choice question picked."""
+        return str(self._get(name)["choice"])
+
+    def confidence(self, name: str) -> float:
+        """Confidence reported for a score or choice answer (1.0 if absent)."""
+        return float(self._get(name).get("confidence", 1.0))
+
+
+class JevClient:
+    """Sends a state and typed questions to Jev and returns the answers."""
+
+    def __init__(
+        self,
+        url: str | None = None,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float | None = None,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.url = url or os.environ.get("ASC_GUARD_JEV_URL", DEFAULT_URL)
+        self.api_key = api_key or os.environ.get("TYPESAFE_API_KEY", "")
+        self.model = model or os.environ.get("ASC_GUARD_MODEL", "jev-latest")
+        self.timeout = timeout or float(os.environ.get("ASC_GUARD_TIMEOUT", "10"))
+        self._transport = transport
+
+    def ask(self, state: Any, questions: dict[str, Any]) -> Answers:
+        """Ask all questions about one state.
+
+        Raises:
+            JevError: On network failure, a bad status, or a malformed reply.
+        """
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        body = {"model": self.model, "state": state, "questions": questions}
+        deadline = time.monotonic() + self.timeout
+        last = "no attempt made"
+        for attempt in range(3):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                with httpx.Client(timeout=remaining, transport=self._transport) as c:
+                    resp = c.post(self.url, headers=headers, json=body)
+            except httpx.HTTPError as e:
+                last = f"network error: {e}"
+            else:
+                if resp.status_code == 200:
+                    return self._parse(resp)
+                last = f"HTTP {resp.status_code}"
+                if resp.status_code not in _RETRY_STATUS:
+                    break
+            time.sleep(min(0.3 * 2**attempt, max(deadline - time.monotonic(), 0)))
+        raise JevError(f"Jev unavailable ({last})")
+
+    @staticmethod
+    def _parse(resp: httpx.Response) -> Answers:
+        try:
+            answers = resp.json()["answers"]
+        except (ValueError, KeyError, TypeError) as e:
+            raise JevError(f"malformed Jev response: {e}") from e
+        if not isinstance(answers, dict):
+            raise JevError("malformed Jev response: answers is not a map")
+        return Answers(answers)
