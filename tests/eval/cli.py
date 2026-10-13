@@ -28,6 +28,13 @@ CASES = click.option(
 )
 
 
+def filters(f):  # type: ignore[no-untyped-def]
+    """Add --split, --kind and --source to a command."""
+    for name in ("source", "kind", "split"):
+        f = click.option(f"--{name}", multiple=True, help=f"Only these {name}s.")(f)
+    return f
+
+
 @click.group()
 def main() -> None:
     """Evaluate asc-guard against agent-guard-bench cases."""
@@ -93,23 +100,41 @@ def run(
 @main.command("score")
 @click.argument("results", type=click.Path(exists=True, path_type=Path))
 @CASES
+@filters
 @click.option("--json", "as_json", is_flag=True, help="Print the full report.")
-def score_cmd(results: Path, cases_path: Path, as_json: bool) -> None:  # noqa: FBT001
-    """Score a results file."""
-    report = score(load_cases(cases_path), read_results(results))
+def score_cmd(  # noqa: PLR0913
+    results: Path,
+    cases_path: Path,
+    split: tuple[str, ...],
+    kind: tuple[str, ...],
+    source: tuple[str, ...],
+    as_json: bool,  # noqa: FBT001
+) -> None:
+    """Score a results file, optionally only some splits, kinds or sources."""
+    cases = load_cases(cases_path, split, kind, source)
+    report = score(cases, read_results(results))
     click.echo(json.dumps(report, indent=2) if as_json else format_report(report))
 
 
 @main.command("sweep")
 @click.argument("results", type=click.Path(exists=True, path_type=Path))
 @CASES
+@filters
 @click.option("--param", required=True, help="A threshold name, e.g. allow_user_p.")
 @click.option("--values", required=True, help="Comma-separated values to try.")
-def sweep_cmd(results: Path, cases_path: Path, param: str, values: str) -> None:
+def sweep_cmd(  # noqa: PLR0913
+    results: Path,
+    cases_path: Path,
+    split: tuple[str, ...],
+    kind: tuple[str, ...],
+    source: tuple[str, ...],
+    param: str,
+    values: str,
+) -> None:
     """Re-apply the policy to saved answers with other thresholds."""
     try:
         rows = sweep(
-            load_cases(cases_path),
+            load_cases(cases_path, split, kind, source),
             read_results(results),
             param,
             [float(v) for v in values.split(",")],

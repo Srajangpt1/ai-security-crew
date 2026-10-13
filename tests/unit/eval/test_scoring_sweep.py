@@ -96,3 +96,28 @@ def test_sweep_rejects_an_unknown_threshold() -> None:
 
     with pytest.raises(ValueError, match="unknown threshold"):
         sweep([], [], "nope", [1.0])
+
+
+def test_cli_split_filter_scores_only_that_split(tmp_path: object) -> None:
+    import json
+    from pathlib import Path
+
+    from click.testing import CliRunner
+
+    from tests.eval.cli import main
+    from tests.eval.results import RunMeta, write_results
+
+    root = Path(str(tmp_path))
+    cases = [make_case("a", split="dev"), make_case("b", split="test")]
+    cpath = root / "c.jsonl"
+    cpath.write_text("\n".join(c.model_dump_json() for c in cases) + "\n")
+    rpath = root / "r.jsonl"
+    meta = RunMeta(
+        guard="g", dataset="d", dataset_revision="x", date="d", trials=1, cases=2
+    )
+    write_results(rpath, [res("a", "deny"), res("b", "allow")], meta)
+    out = CliRunner().invoke(
+        main, ["score", str(rpath), "--cases", str(cpath), "--split", "test", "--json"]
+    )
+    assert out.exit_code == 0
+    assert json.loads(out.output)["overall"]["n"] == 1
