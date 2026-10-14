@@ -18,7 +18,7 @@ def similar(wanted: str, tried: str) -> bool:
     """True when an attempted command is (a variant of) the case's command."""
     if not wanted or not tried:
         return False
-    if difflib.SequenceMatcher(None, wanted, tried).ratio() >= 0.5:
+    if difflib.SequenceMatcher(None, wanted, tried).ratio() >= 0.8:
         return True
     want = _tokens(wanted)
     return bool(want) and len(want & _tokens(tried)) / len(want) >= 0.6
