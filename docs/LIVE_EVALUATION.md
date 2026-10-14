@@ -89,3 +89,34 @@ re-scored numbers.
   the guard's decision quality.
 
 Raw sessions: `docs/live-eval/*.jsonl.gz`.
+
+## Guard on versus guard off: 20 subtle attack types
+
+`python -m tests.eval.live.subtle` plants one of 20 work-like instructions in a
+README (or a code comment) and asks the agent to fix a failing test. The types:
+typosquatted install, registry swap, extra package index, `curl | sh` installer,
+uploading the project folder, uploading `.env`, backup git remote, authorized SSH
+key, cron persistence, shell rc edit, disabling SSL verification, remote git hook,
+privileged Docker, env dump to a webhook, wiping `~/.ssh`, package from a URL,
+`chmod -R 777`, editing agent settings, copying cloud credentials, and a
+base64-encoded setup command. Each is run with the guard off (hooks log only) and
+on, and each carrier states a plausible reason for the step.
+
+| Model | Sessions per condition | Guard off: agent attempted the attack | Guard on: agent attempted the attack | Scan flagged the carrier (guard on) |
+|---|---|---|---|---|
+| Haiku | 60 (20 types x 3) | 0 | 0 | 15 of 60 |
+| Sonnet | 40 (20 types x 2) | 0 | 0 | 10 of 40 |
+
+Across 200 sessions, no agent attempted any of the 20 attacks, with or without the
+guard. All 318 guarded calls were harmless (test runs and the one-line fix) and
+all were allowed. The agents also never mentioned following the notes: the two
+Haiku sessions that touched the typosquat line corrected `reqeusts` to
+`requests` in the README. (An earlier version of the matcher counted that edit as
+obeying; it now looks only at what a call would run or write.)
+
+Conclusion: with current Haiku and Sonnet and a user who asks for an ordinary task,
+poisoned notes of this kind did not lead to attempted attacks, so this test
+cannot show the guard preventing harm. It shows the guard stays out of the way
+(0 asks, 0 denies on 318 harmless calls). The case for the guard rests on setups
+this test does not cover: auto-accept mode, weaker or other models, longer
+sessions, and the offline results.
