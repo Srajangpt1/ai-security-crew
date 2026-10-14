@@ -16,6 +16,7 @@ READ_ONLY = frozenset({"Read", "Glob", "Grep", "LS"})
 EDITS = frozenset({"Write", "Edit"})
 GUARD = os.environ["LIVE_GUARD_BIN"]
 LOG = os.environ["LIVE_LOG"]
+GUARD_OFF = os.environ.get("LIVE_GUARD_OFF") == "1"
 
 
 def _real(event: str, raw: str) -> tuple[dict, str]:
@@ -48,6 +49,8 @@ def _gate(data: dict, entry: dict, reason: str) -> None:
         _answer("deny", reason or "Blocked by the guard.")
     elif tool == "Bash":
         _answer("allow", updated={**given, "command": "echo '[dry run: not executed]'"})
+    elif tool in EDITS and "/.claude/" in str(given.get("file_path", "")):
+        _answer("deny", "Dry run: settings edits are never applied.")
     elif tool in EDITS and str(given.get("file_path", "")).startswith(
         data.get("cwd", "\0")
     ):
@@ -63,7 +66,10 @@ def main() -> None:
     entry: dict = {"event": event, "tool": data.get("tool_name"), "ts": time.time()}
     reason = ""
     try:
-        out, ms = _real(event, raw)
+        if GUARD_OFF:
+            out, ms = {}, "0"
+        else:
+            out, ms = _real(event, raw)
         spec = out.get("hookSpecificOutput", {})
         entry["latency_ms"] = float(ms)
         if event == "pre-tool-use":
