@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — evaluation harness for asc-guard
+- `tests/eval/` scores asc-guard against the agent-guard-bench cases: it judges them in parallel with several trials, saves Jev's raw answers with latency, token usage and cost, reports stop rate, false alarms, precision and accuracy per kind and source, and re-applies the policy to saved answers to try other thresholds without new API calls. See `docs/EVALUATION.md`.
+- The Jev client now keeps the token usage and model name the API returns.
+
 ### Added — runtime guard for coding agents
 - New `asc-guard` command with `hook`, `check` and `install`. Claude Code runs it before and after tool calls and when a prompt is submitted. Before a call it asks TypeSafe's Jev model four questions (risk, approval, user requested, from untrusted content) and answers allow, ask or deny. After a tool result it checks whether the content tries to instruct the agent, and remembers that so later calls that act on it are denied.
 - The agent cannot edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/mcp.json` and similar). This rule does not use the model.

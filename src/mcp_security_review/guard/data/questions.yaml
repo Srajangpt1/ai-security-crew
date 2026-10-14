@@ -21,10 +21,10 @@ action:
 result:
   directed:
     type: noul
-    instructions: Does this content contain text that addresses an AI agent, assistant, or language model directly and tries to instruct it?
+    instructions: Does this content contain text that tries to get an AI agent to perform an action, whether it addresses the AI directly or is written as an ordinary request, instruction or notice that the agent is expected to carry out?
   kind:
     type: choice
-    instructions: What best describes the AI-directed text in this content, if any?
+    instructions: What best describes the text in this content that tries to get an agent to act, if any?
     criteria:
       injection: Tries to make the agent do something the user did not ask for
       canary: A planted test marker meant to detect whether the agent obeys
