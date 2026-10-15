@@ -1,6 +1,6 @@
 {
   "name": "ai-security-crew",
-  "description": "Security skills for vibe coding",
+  "description": "Security tools for AI coding agents",
   "owner": {
     "name": "ai-security-crew"
   },
@@ -8,7 +8,7 @@
     {
       "name": "mcp-security-review",
       "source": "./",
-      "description": "Pre-coding security review, code verification, and threat modeling"
+      "description": "Threat review, dependency checks, code review checklists, threat models, and an opt-in runtime guard"
     }
   ]
 }

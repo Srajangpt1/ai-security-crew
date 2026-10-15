@@ -1,13 +1,15 @@
 """The asc-guard command."""
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
 from mcp_security_review.guard.cli import main
-from mcp_security_review.guard.install import UVX_PREFIX, build_hooks, install
+from mcp_security_review.guard.install import GATE, UVX_PREFIX, build_hooks, install
 
 PRE = {
     "hook_event_name": "PreToolUse",
@@ -71,7 +73,7 @@ def test_install_replaces_an_older_copy(tmp_path: Path) -> None:
         g["hooks"][0]["command"]
         for g in json.loads(path.read_text())["hooks"]["PreToolUse"]
     ]
-    assert commands == ["asc-guard hook pre-tool-use"]
+    assert commands == [GATE + "asc-guard hook pre-tool-use"]
 
 
 def test_install_rejects_broken_json(tmp_path: Path) -> None:
@@ -84,3 +86,18 @@ def test_install_rejects_broken_json(tmp_path: Path) -> None:
 def test_plugin_hooks_file_matches_the_installer() -> None:
     plugin = Path(__file__).parents[3] / "hooks" / "hooks.json"
     assert json.loads(plugin.read_text()) == {"hooks": build_hooks(UVX_PREFIX)}
+
+
+@pytest.mark.parametrize(
+    ("env", "code"),
+    [({}, 0), ({"TYPESAFE_API_KEY": "k"}, 1), ({"ASC_GUARD_ENABLE": "1"}, 1)],
+)
+def test_hook_command_skips_the_guard_without_a_key(
+    env: dict[str, str], code: int
+) -> None:
+    # `false` stands in for the guard: it runs (exit 1) only when a key is set.
+    command = build_hooks("false")["PreToolUse"][0]["hooks"][0]["command"]
+    done = subprocess.run(
+        ["sh", "-c", command], env={"PATH": os.environ["PATH"], **env}, check=False
+    )
+    assert done.returncode == code
