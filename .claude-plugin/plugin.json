@@ -1,8 +1,18 @@
 {
   "name": "mcp-security-review",
-  "description": "Security skills for vibe coding — pre-coding security assessment, code vulnerability review, and threat modeling. Works without any MCP server.",
+  "description": "Security for AI coding: pre-coding threat review, dependency checks, code review checklists, threat models, and an opt-in runtime guard (asc-guard) for agent tool calls.",
   "author": {
     "name": "Srajan Gupta",
     "url": "https://github.com/Srajangpt1/ai-security-crew"
+  },
+  "mcpServers": {
+    "sec-review": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Srajangpt1/ai-security-crew",
+        "mcp-security-review"
+      ]
+    }
   }
 }

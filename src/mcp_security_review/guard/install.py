@@ -7,6 +7,9 @@ from typing import Any
 # Matches both `asc-guard hook ...` and the uvx form.
 MARKER = "asc-guard hook"
 UVX_PREFIX = "uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard"
+# Without a key the guard is off, so skip starting it at all: each start costs
+# about a second, on every tool call.
+GATE = '[ -n "$TYPESAFE_API_KEY$ASC_GUARD_ENABLE" ] || exit 0; '
 # (event, subcommand, matcher, timeout seconds)
 EVENTS = (
     ("PreToolUse", "pre-tool-use", "*", 20),
@@ -21,7 +24,7 @@ def build_hooks(prefix: str) -> dict[str, Any]:
     for event, sub, matcher, timeout in EVENTS:
         handler = {
             "type": "command",
-            "command": f"{prefix} hook {sub}",
+            "command": f"{GATE}{prefix} hook {sub}",
             "timeout": timeout,
         }
         group: dict[str, Any] = {"hooks": [handler]}

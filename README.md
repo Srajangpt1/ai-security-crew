@@ -7,22 +7,22 @@ Security guidance for AI coding agents. Before your agent writes code, it gets t
 
 ## Install
 
-Pick one. The skills work on their own. The MCP server adds the dependency checks and the full tool set.
+Pick one. The plugin gives you everything in Claude Code; the MCP server alone works in any MCP client.
 
-### Option 1: Claude Code plugin (skills only)
+### Option 1: Claude Code plugin
 
 ```
 /plugin marketplace add Srajangpt1/ai-security-crew
 /plugin install mcp-security-review@ai-security-crew
 ```
 
-You get three commands in any project:
+It installs three parts. Running the MCP server and the guard needs [uv](https://docs.astral.sh/uv/).
 
-| Command | When to use |
-|---------|-------------|
-| `/sec-review` | Before coding: risk level and a security prompt for the task |
-| `/verify-code` | After coding: review the code with a checklist and prioritized fixes |
-| `/threat-model` | For new features: threats, mitigations, and an optional `threat-model.md` |
+| Part | What it does |
+|------|--------------|
+| MCP server (`sec-review`) | The tools below. The server starts from GitHub through `uvx`. |
+| Skills | `/security-review` before coding, `/verify-code` after coding, `/threat-model` for new features. They use the MCP tools and fall back to plain guidance without them. |
+| Hooks ([asc-guard](#runtime-guard-asc-guard)) | Off until `TYPESAFE_API_KEY` is set. Without the key they exit at once and add no delay. |
 
 ### Option 2: MCP server
 
@@ -137,13 +137,13 @@ export TYPESAFE_API_KEY=...      # the guard is off until this is set
 asc-guard install                # adds the hooks to .claude/settings.json (--scope user for all projects)
 ```
 
-The plugin also ships `hooks/hooks.json`, which does the same thing through `uvx` once the key is set. `asc-guard check Bash '{"command": "npm test"}'` judges a single call (exit code 0 allow, 1 ask, 2 deny).
+The plugin ships the same hooks in `hooks/hooks.json`; they run the guard through `uvx` only when the key is set. `asc-guard check Bash '{"command": "npm test"}'` judges a single call (exit code 0 allow, 1 ask, 2 deny).
 
 Things to know:
 
 - **Data leaves your machine.** Commands, file paths and tool output are sent to TypeSafe for judgment. That is why the guard is opt-in.
 - **If Jev is unreachable,** shell, network and MCP calls ask you first; everything else goes ahead.
-- **Thresholds** are in `src/mcp_security_review/guard/data/policy.yaml` and can be overridden with `ASC_GUARD_<NAME>` variables. They are provisional until the evaluation harness exists.
+- **Thresholds** are in `src/mcp_security_review/guard/data/policy.yaml` and can be overridden with `ASC_GUARD_<NAME>` variables. They were tuned with the evaluation harness (see `docs/EVALUATION.md`).
 - **State** (recent messages, flagged content, audit log) is kept under `~/.ai-security-crew/guard/`.
 - Claude Code only for now.
 
