@@ -42,11 +42,15 @@ def test_state_carries_user_messages_and_flagged_content() -> None:
     assert state["flagged_untrusted_content"] == ["bad"]
 
 
-def test_jev_down_asks_for_shell_but_not_for_edits() -> None:
+def test_jev_down_leaves_every_call_to_the_client_settings() -> None:
     down = FakeClient(fail=True)
-    assert handle(pre(command="ls"), down).action == "ask"
-    assert handle(pre("WebFetch", url="https://x.test"), down).action == "ask"
-    assert handle(pre("Edit", file_path="/repo/a.py"), down).action == "allow"
+    for event in (
+        pre(command="rm -rf build"),
+        pre("WebFetch", url="https://x.test"),
+        pre("Edit", file_path="/repo/a.py"),
+    ):
+        decision = handle(event, down)
+        assert decision.action == "allow" and not decision.context
 
 
 def test_flagged_result_then_matching_call_is_denied() -> None:

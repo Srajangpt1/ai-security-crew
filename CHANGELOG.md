@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The Claude Code plugin now registers the MCP server (`sec-review`), so one install gives the tools, the skills and the guard hooks.
 - The guard hooks check for `TYPESAFE_API_KEY` (or `ASC_GUARD_ENABLE`) before starting `uvx`. Without a key they exit at once instead of adding about a second to every tool call. `asc-guard install` writes the same check.
 - Removed the duplicate `commands/` copies of the skills.
+- When Jev cannot be reached, the guard no longer asks before shell, network and MCP calls. It steps aside and the client's own permission settings decide.
 - Rewrote the three skills around the current tools: the component menu, threats and countermeasures for the picked components, the code review checklist that never receives code, and reachability checks on dependency findings. Each falls back to plain guidance when the tools are not available.
 
 ### Added — evaluation harness for asc-guard

@@ -18,8 +18,6 @@ from mcp_security_review.guard.protect import protected_target
 from mcp_security_review.guard.scan import WARNING, scan_result
 from mcp_security_review.guard.session import SessionStore
 
-# If Jev is down, these kinds of calls ask the user; the rest go ahead.
-FAIL_ASK_KINDS = frozenset({"shell", "network", "mcp"})
 MAX_FIELD = 2000
 
 
@@ -61,9 +59,8 @@ def _pre(
         state["flagged_untrusted_content"] = store.flagged()
     try:
         answers = client.ask(state, load_questions()["action"])
-    except JevError as e:
-        if event.kind in FAIL_ASK_KINDS:
-            return Decision("ask", f"Security check unavailable ({e}); please confirm.")
+    except JevError:
+        # Stay out of the way: the client's own permission settings decide.
         return Decision()
     return decide_action(answers, t)
 

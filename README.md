@@ -218,7 +218,7 @@ asc-guard install                # adds the hooks to .claude/settings.json (--sc
 ### Things to know
 
 - **Data leaves your machine.** Commands, file paths and tool output are sent to TypeSafe for judgment. That is why the guard is opt-in.
-- **If Jev is unreachable,** shell, network and MCP calls ask you first; everything else goes ahead.
+- **If Jev is unreachable,** the guard steps aside and your normal Claude Code permission settings decide. The config-file rule still applies, since it does not need the model.
 - **Thresholds** are in `src/mcp_security_review/guard/data/policy.yaml` and can be overridden with `ASC_GUARD_<NAME>` variables.
 - **Evaluation:** an offline evaluation harness scores the guard against a benchmark of attack and benign cases. See [docs/EVALUATION.md](docs/EVALUATION.md).
 - **State** (recent messages, flagged content, audit log) is kept under `~/.ai-security-crew/guard/`.
