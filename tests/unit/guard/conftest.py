@@ -48,6 +48,10 @@ class FakeClient:
 def guard_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home = tmp_path / "guard-home"
     monkeypatch.setenv("ASC_GUARD_HOME", str(home))
-    for name in ("TYPESAFE_API_KEY", "ASC_GUARD_ENABLE"):
+    for name in (
+        "TYPESAFE_API_KEY",
+        "ASC_GUARD_ENABLE",
+        "CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
     return home

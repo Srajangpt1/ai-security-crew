@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook pre-tool-use",
+            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE$CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook pre-tool-use",
             "timeout": 20
           }
         ],
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook post-tool-use",
+            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE$CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook post-tool-use",
             "timeout": 20
           }
         ],
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook user-prompt",
+            "command": "[ -n \"$TYPESAFE_API_KEY$ASC_GUARD_ENABLE$CLAUDE_PLUGIN_OPTION_TYPESAFE_API_KEY\" ] || exit 0; uvx --from git+https://github.com/Srajangpt1/ai-security-crew asc-guard hook user-prompt",
             "timeout": 10
           }
         ]

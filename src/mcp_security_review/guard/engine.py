@@ -7,14 +7,14 @@ from mcp_security_review.guard import audit
 from mcp_security_review.guard.clip import clip
 from mcp_security_review.guard.decision import Decision
 from mcp_security_review.guard.events import READ_ONLY_TOOLS, Event
-from mcp_security_review.guard.jev import JevClient, JevError
+from mcp_security_review.guard.jev import JevClient, JevError, configured_key
 from mcp_security_review.guard.policy import (
     Thresholds,
     decide_action,
     load_questions,
     load_thresholds,
 )
-from mcp_security_review.guard.protect import protected_target
+from mcp_security_review.guard.protect import block_reason
 from mcp_security_review.guard.scan import WARNING, scan_result
 from mcp_security_review.guard.session import SessionStore
 
@@ -24,7 +24,7 @@ MAX_FIELD = 2000
 def is_enabled() -> bool:
     """The guard runs only when a key is set or ASC_GUARD_ENABLE is truthy."""
     flag = os.environ.get("ASC_GUARD_ENABLE", "").lower()
-    return bool(os.environ.get("TYPESAFE_API_KEY")) or flag in ("1", "true", "yes")
+    return bool(configured_key()) or flag in ("1", "true", "yes")
 
 
 def _trim(value: Any) -> Any:
@@ -40,13 +40,6 @@ def _trim(value: Any) -> Any:
 def _pre(
     event: Event, client: JevClient, store: SessionStore, t: Thresholds
 ) -> Decision:
-    target = protected_target(event)
-    if target:
-        return Decision(
-            "deny",
-            f"Blocked: {target} is agent config or a hook file. Ask the user to "
-            "change it themselves.",
-        )
     if event.tool in READ_ONLY_TOOLS:
         return Decision()
     state: dict[str, Any] = {
@@ -58,11 +51,10 @@ def _pre(
     if store.flagged():
         state["flagged_untrusted_content"] = store.flagged()
     try:
-        answers = client.ask(state, load_questions()["action"])
+        return decide_action(client.ask(state, load_questions()["action"]), t)
     except JevError:
         # Stay out of the way: the client's own permission settings decide.
         return Decision()
-    return decide_action(answers, t)
 
 
 def _post(
@@ -86,6 +78,13 @@ def handle(
     thresholds: Thresholds | None = None,
 ) -> Decision:
     """Run the guard on one event and log the outcome."""
+    # The protected-file rule comes first and needs nothing else, so no setting
+    # or outage of the decision model can switch it off.
+    reason = block_reason(event) if event.phase == "pre" else None
+    if reason:
+        decision = Decision("deny", reason)
+        audit.record(event, decision)
+        return decision
     client = client or JevClient()
     store = store or SessionStore(event.session_id)
     t = thresholds or load_thresholds()

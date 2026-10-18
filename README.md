@@ -45,7 +45,7 @@ This installs everything. The MCP server and the guard run through [uv](https://
 |---------|-------|
 | MCP server (`sec-review`) | The tools listed under [Code security](#code-security). Starts from GitHub through `uvx` |
 | Skills | `/security-review` before coding, `/verify-code` after coding, `/threat-model` for new features. They use the MCP tools and fall back to plain guidance without them |
-| Guard hooks | Off until you set `TYPESAFE_API_KEY`. Without the key they exit at once and add no delay. See [Agent security](#agent-security-asc-guard) |
+| Guard hooks | Off until you give a TypeSafe API key: Claude Code asks for it when you enable the plugin, or set `TYPESAFE_API_KEY`. Without a key they exit at once and add no delay. See [Agent security](#agent-security-asc-guard) |
 
 ### MCP server only (any MCP client)
 
@@ -186,7 +186,7 @@ Rules about commands cannot tell a command you asked for from the same command p
 
   A small policy turns the answers into **allow**, **ask** or **deny**. Read-only tools are not judged.
 - **After each tool result**, it checks whether the content tries to get the agent to act. Flagged content is remembered for the rest of the session, so later calls are judged against it, and the agent is warned not to follow it.
-- **One rule does not depend on the model**: the agent may not edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/mcp.json`, and similar), so a misled agent cannot switch the guard off.
+- **One rule does not depend on the model**: the agent may not edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/hooks.json`, `.vscode/mcp.json`, and similar) or remove the folders that hold them, so a misled agent cannot switch the guard off. The rule runs before anything else, and reads shell commands closely enough to catch redirects, `sh -c` and interpreter one-liners, `cd`, globs, PowerShell paths and filesystem MCP servers. It cannot see a path that a script builds at run time; those calls are left to the model.
 
 ### Example
 
@@ -198,31 +198,65 @@ Denied: This call follows instructions found in content the agent read.
 
 Work you asked for, such as running the tests or committing your change, goes through without prompts, because the guard can see that you requested it.
 
-### Turn it on
+### Install and turn it on
 
-With the plugin, the hooks are already installed. Set the key to turn them on:
+The guard works in **Claude Code** and **Cursor**. You need [uv](https://docs.astral.sh/uv/) and a TypeSafe API key; without a key the guard stays off.
 
-```bash
-export TYPESAFE_API_KEY=...
+**Claude Code, with the plugin**
+
+```
+/plugin marketplace add Srajangpt1/ai-security-crew
+/plugin install mcp-security-review@ai-security-crew
 ```
 
-Without the plugin:
+The plugin installs the hooks. When you enable it, Claude Code asks for a TypeSafe API key: enter it to turn the guard on, or leave it empty to keep the guard off. The key is kept in your system's credential store. A `TYPESAFE_API_KEY` environment variable also works and takes precedence.
+
+**Cursor, or Claude Code without the plugin**
 
 ```bash
+uv tool install --python 3.12 git+https://github.com/Srajangpt1/ai-security-crew   # puts asc-guard on your PATH
 export TYPESAFE_API_KEY=...
-asc-guard install                # adds the hooks to .claude/settings.json (--scope user for all projects)
+asc-guard install --client cursor        # writes .cursor/hooks.json
+asc-guard install --client claude-code   # writes .claude/settings.json (the default client)
 ```
 
-`asc-guard check Bash '{"command": "npm test"}'` judges a single call (exit code 0 allow, 1 ask, 2 deny).
+- `--scope user` installs for every project (`~/.cursor/hooks.json` or `~/.claude/settings.json`). `--print` shows the hooks without writing anything.
+- Running `install` again is safe. It replaces its own hooks and keeps everything else in the file. It refuses to touch a file it cannot read, and a failed write leaves the old file as it was.
+- In Cursor, install with `--client cursor` even if you have the Claude Code plugin. Cursor also runs Claude Code's hooks, but those step aside in Cursor so that no call is judged twice.
+- Cursor can only ask for your approval before shell and MCP calls. For file writes and web fetches, where the guard would ask, it blocks the call and tells you why.
+
+### Check that it is on
+
+- The hooks are listed: in Claude Code with `/hooks`; in Cursor under the **Hooks** tab in Customize, or in the **Hooks** output channel.
+- Ask the agent to edit `.claude/settings.json` (or `.cursor/hooks.json`). The guard blocks it with `Blocked: ... is agent config or a hook file`. This rule does not call TypeSafe, so it confirms that the hooks run and see your key.
+- Every ask and deny is logged to `~/.ai-security-crew/guard/audit.jsonl`.
+- `asc-guard check Bash '{"command": "npm test"}'` judges a single call (exit code 0 allow, 1 ask, 2 deny).
+
+### Troubleshooting
+
+| Problem | What to do |
+|---------|-----------|
+| `... is not valid JSON` or `'hooks' must map each event to a list of objects` | The config file has a mistake. Fix or remove it and run `install` again. The file was not changed. |
+| `Could not write ...` | Check that you can write to the folder and that no other program has the file locked. The old file is kept. |
+| The guard never blocks anything | The key is not reaching the client. An app started from a desktop icon may not see variables set in your shell profile: start it from a terminal, or set the key system-wide. With the plugin, re-enter the key in its settings under `/plugin`. |
+| `uvx` or `asc-guard` not found | Install uv. After `uv tool install`, run `uv tool update-shell` and open a new terminal. `install` writes the full path of a lasting `asc-guard`, or of `uvx` when it runs from a throwaway `uvx` environment, so run `install` again after moving either. |
+| `uv tool install` tries to build `pydantic-core` | uv picked a Python too new for the pinned pydantic. Add `--python 3.12`. |
+| Errors in Cursor's Hooks output channel | When a guard call fails, Cursor logs it and lets the call through. The message there says why. |
+
+### Turn it off or remove it
+
+- **Turn it off:** remove the key (unset `TYPESAFE_API_KEY`, or clear it in the plugin settings). The hooks stay installed and do nothing.
+- **Remove it from Claude Code:** `claude plugin uninstall mcp-security-review@ai-security-crew`, or delete the hook entries whose command runs `asc-guard ... hook` from `.claude/settings.json`.
+- **Remove it from Cursor:** delete the entries whose command runs `asc-guard ... hook` from `.cursor/hooks.json`.
+- Edit these files yourself: the guard stops the agent from changing them.
 
 ### Things to know
 
 - **Data leaves your machine.** Commands, file paths and tool output are sent to TypeSafe for judgment. That is why the guard is opt-in.
-- **If Jev is unreachable,** the guard steps aside and your normal Claude Code permission settings decide. The config-file rule still applies, since it does not need the model.
+- **If Jev is unreachable,** the guard steps aside and the client's own permission settings decide. The config-file rule still applies, since it does not need the model.
 - **Thresholds** are in `src/mcp_security_review/guard/data/policy.yaml` and can be overridden with `ASC_GUARD_<NAME>` variables.
 - **Evaluation:** an offline evaluation harness scores the guard against a benchmark of attack and benign cases. See [docs/EVALUATION.md](docs/EVALUATION.md).
 - **State** (recent messages, flagged content, audit log) is kept under `~/.ai-security-crew/guard/`.
-- Claude Code only for now.
 
 ## Contributing
 

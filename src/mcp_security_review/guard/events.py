@@ -6,7 +6,8 @@ from typing import Any, Literal
 Phase = Literal["pre", "post", "prompt"]
 
 SHELL_TOOLS = frozenset({"Bash", "PowerShell"})
-FILE_WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
+# Delete is Cursor's; deleting a hook file would switch the guard off.
+FILE_WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit", "Delete"})
 NETWORK_TOOLS = frozenset({"WebFetch", "WebSearch"})
 # Tools that only read local state or hand work to another agent.
 READ_ONLY_TOOLS = frozenset(

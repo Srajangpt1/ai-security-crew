@@ -14,5 +14,13 @@
         "mcp-security-review"
       ]
     }
+  },
+  "userConfig": {
+    "typesafe_api_key": {
+      "type": "string",
+      "title": "TypeSafe API key (optional)",
+      "description": "Turns on the asc-guard runtime guard. Commands, file paths and tool output are then sent to TypeSafe for judgment. Leave empty to keep the guard off.",
+      "sensitive": true
+    }
   }
 }

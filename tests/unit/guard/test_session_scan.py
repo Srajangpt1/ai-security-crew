@@ -1,5 +1,9 @@
 """Session memory and the tool-result scan."""
 
+from pathlib import Path
+
+import pytest
+
 from mcp_security_review.guard.clip import clip
 from mcp_security_review.guard.events import Event
 from mcp_security_review.guard.policy import load_thresholds
@@ -72,6 +76,29 @@ def test_clip_keeps_both_ends() -> None:
     short = clip(text, 100)
     assert short.startswith("HEAD") and short.endswith("TAIL-PAYLOAD")
     assert len(short) < 130 and clip("small", 100) == "small"
+
+
+@pytest.mark.parametrize(
+    "text", ["[1, 2]", '{"prompts": 5}', '{"prompts": [1, null], "flagged": {}}']
+)
+def test_a_session_file_of_the_wrong_shape_is_treated_as_empty(text: str) -> None:
+    store = SessionStore("s1")
+    store.path.parent.mkdir(parents=True)
+    store.path.write_text(text)
+    assert store.prompts() == [] and store.flagged() == []
+    store.add_prompt("next")  # recovers on the next write
+    assert store.prompts()[-1] == "next"
+
+
+def test_a_failed_save_is_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def locked(self: Path, target: Path) -> None:
+        raise PermissionError("file in use")
+
+    monkeypatch.setattr(Path, "replace", locked)
+    store = SessionStore("s1")
+    store.add_prompt("hi")
+    store.add_flagged("bad")
+    assert not list(store.path.parent.glob("*.tmp"))  # no leftovers
 
 
 def test_flagged_memory_keeps_the_end_of_long_content() -> None:
