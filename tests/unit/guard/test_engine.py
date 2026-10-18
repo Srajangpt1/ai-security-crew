@@ -1,9 +1,13 @@
 """End-to-end guard behavior with a fake Jev."""
 
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from mcp_security_review.guard.engine import handle, is_enabled
 from mcp_security_review.guard.events import Event
+from mcp_security_review.guard.jev import Answers
 from mcp_security_review.guard.session import SessionStore, guard_home
 from tests.unit.guard.conftest import FakeClient, make_answers, result_answers
 
@@ -105,6 +109,36 @@ def test_enabled_only_with_a_key_or_flag(monkeypatch: Any) -> None:
     monkeypatch.delenv("TYPESAFE_API_KEY")
     monkeypatch.setenv("ASC_GUARD_ENABLE", "1")
     assert is_enabled() is True
+
+
+def test_the_protected_rule_does_not_depend_on_jev_settings(monkeypatch: Any) -> None:
+    # A bad setting must not switch off the one rule that needs no model.
+    monkeypatch.setenv("ASC_GUARD_TIMEOUT", "abc")
+    assert handle(pre("Write", file_path="/repo/.mcp.json")).action == "deny"
+
+
+@pytest.mark.parametrize(
+    "answers",
+    [
+        {"risk": {"score": "high"}},
+        {"risk": {"score": 1.0}, "approval": {}, "user_requested": 5},
+        {"risk": None},
+    ],
+)
+def test_a_malformed_jev_answer_steps_aside(answers: Any) -> None:
+    decision = handle(pre(command="rm -rf build"), FakeClient(Answers(answers)))
+    assert decision.action == "allow"
+
+
+def test_the_warning_survives_a_failure_to_save_state(monkeypatch: Any) -> None:
+    def locked(self: Path, target: Path) -> None:
+        raise PermissionError("file in use")
+
+    monkeypatch.setattr(Path, "replace", locked)
+    post = Event("post", "s1", "/repo", "WebFetch", {}, INJECTION)
+    d = handle(post, FakeClient(result_answers(0.98, "injection")))
+    assert "Do not follow" in d.context
+    handle(Event("prompt", "s1", prompt="fix it"), FakeClient())  # no error
 
 
 def test_a_payload_at_the_end_of_a_long_command_is_still_sent() -> None:

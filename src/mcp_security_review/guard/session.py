@@ -1,5 +1,6 @@
 """Per-session memory: what the user said and what looked like an injection."""
 
+import contextlib
 import json
 import os
 import re
@@ -29,14 +30,28 @@ class SessionStore:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
-            return {"prompts": [], "flagged": []}
-        return {k: [str(x) for x in data.get(k, [])] for k in ("prompts", "flagged")}
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        return {
+            key: [x for x in value if isinstance(x, str)]
+            if isinstance(value := data.get(key), list)
+            else []
+            for key in ("prompts", "flagged")
+        }
 
     def _save(self, data: dict[str, list[str]]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(data), encoding="utf-8")
-        tmp.replace(self.path)
+        """Best effort. Hooks for parallel tool calls run at the same time, and
+        Windows locks open files: losing one update beats failing the call.
+        """
+        tmp = self.path.with_name(f"{self.path.stem}.{os.getpid()}.tmp")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp.write_text(json.dumps(data), encoding="utf-8")
+            tmp.replace(self.path)
+        except OSError:
+            with contextlib.suppress(OSError):
+                tmp.unlink(missing_ok=True)
 
     def add_prompt(self, text: str) -> None:
         """Remember a message the user typed."""

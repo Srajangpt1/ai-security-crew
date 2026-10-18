@@ -63,6 +63,12 @@ local/
 .pytest_cache/
 .coverage/
 .coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# asc-guard evaluation runs (tests/eval writes results/<guard>-<date>.jsonl)
+/results/
 
 # Pre-commit
 .pre-commit-config.yaml.cache

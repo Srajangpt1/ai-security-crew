@@ -186,7 +186,7 @@ Rules about commands cannot tell a command you asked for from the same command p
 
   A small policy turns the answers into **allow**, **ask** or **deny**. Read-only tools are not judged.
 - **After each tool result**, it checks whether the content tries to get the agent to act. Flagged content is remembered for the rest of the session, so later calls are judged against it, and the agent is warned not to follow it.
-- **One rule does not depend on the model**: the agent may not edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/mcp.json`, and similar), so a misled agent cannot switch the guard off.
+- **One rule does not depend on the model**: the agent may not edit agent config or hook files (`.claude/settings*.json`, `.mcp.json`, `.cursor/hooks.json`, `.vscode/mcp.json`, and similar) or remove the folders that hold them, so a misled agent cannot switch the guard off. The rule runs before anything else, and reads shell commands closely enough to catch redirects, `sh -c` and interpreter one-liners, `cd`, globs, PowerShell paths and filesystem MCP servers. It cannot see a path that a script builds at run time; those calls are left to the model.
 
 ### Example
 

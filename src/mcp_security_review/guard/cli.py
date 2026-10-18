@@ -1,13 +1,12 @@
 """The `asc-guard` command: hook, check and install."""
 
 import json
-import shutil
 import sys
 from pathlib import Path
 
 import click
 
-from mcp_security_review.guard.install import UVX_PREFIX, build_hooks, install
+from mcp_security_review.guard.install import build_hooks, hook_prefix, install
 
 _HOOK_EVENTS = ("pre-tool-use", "post-tool-use", "user-prompt")
 
@@ -27,10 +26,14 @@ def hook(event: str) -> None:
     if not is_enabled():
         return
     try:
-        parsed = claude_code.parse(json.load(sys.stdin))
+        # Bytes, not text: clients send UTF-8 whatever the console code page is.
+        raw = json.loads(sys.stdin.buffer.read())
+        if not isinstance(raw, dict):
+            raise ValueError("hook input is not a JSON object")
+        parsed = claude_code.parse(raw)
         output = claude_code.render(parsed, handle(parsed))
-    except (ValueError, OSError) as e:
-        click.echo(f"asc-guard: skipped ({e})", err=True)
+    except Exception as e:  # noqa: BLE001 - a hook that crashes must still fail open
+        click.echo(f"asc-guard: skipped ({type(e).__name__}: {e})", err=True)
         return
     if output:
         click.echo(json.dumps(output))
@@ -60,7 +63,7 @@ def check(tool: str, tool_input: str, cwd: str) -> None:
 @click.option("--print", "print_only", is_flag=True, help="Show the hooks only.")
 def install_cmd(scope: str, print_only: bool) -> None:
     """Add the guard's hooks to Claude Code's settings."""
-    prefix = "asc-guard" if shutil.which("asc-guard") else UVX_PREFIX
+    prefix = hook_prefix()
     if print_only:
         click.echo(json.dumps({"hooks": build_hooks(prefix)}, indent=2))
         return
@@ -69,5 +72,9 @@ def install_cmd(scope: str, print_only: bool) -> None:
     try:
         changed = install(path, prefix)
     except ValueError as e:
-        raise click.ClickException(str(e)) from e
+        raise click.ClickException(f"{e}\nThe file was not changed.") from e
+    except OSError as e:
+        raise click.ClickException(
+            f"Could not write {path}: {e}\nThe file was not changed."
+        ) from e
     click.echo(f"{'Updated' if changed else 'Already up to date:'} {path}")

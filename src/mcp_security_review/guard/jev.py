@@ -3,6 +3,7 @@
 API reference: https://docs.typesafe.ai/api
 """
 
+import math
 import os
 import time
 from typing import Any
@@ -10,11 +11,22 @@ from typing import Any
 import httpx
 
 DEFAULT_URL = "https://api.typesafe.ai/v1/systemone"
+DEFAULT_TIMEOUT = 10.0
 _RETRY_STATUS = frozenset({429, 500, 502, 503, 504})
+_ATTEMPTS = 3
 
 
 class JevError(RuntimeError):
     """Jev could not be reached or returned something unusable."""
+
+
+def _timeout_setting() -> float:
+    """ASC_GUARD_TIMEOUT in seconds; anything unusable means the default."""
+    try:
+        value = float(os.environ.get("ASC_GUARD_TIMEOUT", DEFAULT_TIMEOUT))
+    except ValueError:
+        return DEFAULT_TIMEOUT
+    return value if math.isfinite(value) and value > 0 else DEFAULT_TIMEOUT
 
 
 class Answers:
@@ -35,26 +47,43 @@ class Answers:
         """The answers exactly as the API returned them."""
         return self._answers
 
-    def _get(self, name: str) -> dict[str, Any]:
-        if name not in self._answers:
+    def _field(self, name: str, field: str, default: Any = None) -> Any:
+        answer = self._answers.get(name)
+        if not isinstance(answer, dict):
             raise JevError(f"missing answer: {name}")
-        return self._answers[name]
+        if field not in answer and default is None:
+            raise JevError(f"answer {name} has no {field}")
+        return answer.get(field, default)
+
+    def _number(self, name: str, field: str, default: float | None = None) -> float:
+        # A wrong shape is the same as no answer: the guard steps aside.
+        value = self._field(name, field, default)
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as e:
+            raise JevError(f"answer {name}.{field} is not a number") from e
+        if not math.isfinite(number):
+            raise JevError(f"answer {name}.{field} is not a finite number")
+        return number
 
     def noul(self, name: str) -> float:
         """Probability that a yes/no question is yes."""
-        return float(self._get(name)["noul"])
+        return self._number(name, "noul")
 
     def score(self, name: str) -> float:
         """Probability-weighted score of a score question."""
-        return float(self._get(name)["score"])
+        return self._number(name, "score")
 
     def choice(self, name: str) -> str:
         """The option a choice question picked."""
-        return str(self._get(name)["choice"])
+        value = self._field(name, "choice")
+        if not isinstance(value, str):
+            raise JevError(f"answer {name}.choice is not text")
+        return value
 
     def confidence(self, name: str) -> float:
         """Confidence reported for a score or choice answer (1.0 if absent)."""
-        return float(self._get(name).get("confidence", 1.0))
+        return self._number(name, "confidence", 1.0)
 
 
 class JevClient:
@@ -71,7 +100,7 @@ class JevClient:
         self.url = url or os.environ.get("ASC_GUARD_JEV_URL", DEFAULT_URL)
         self.api_key = api_key or os.environ.get("TYPESAFE_API_KEY", "")
         self.model = model or os.environ.get("ASC_GUARD_MODEL", "jev-latest")
-        self.timeout = timeout or float(os.environ.get("ASC_GUARD_TIMEOUT", "10"))
+        self.timeout = timeout or _timeout_setting()
         self._transport = transport
 
     def ask(self, state: Any, questions: dict[str, Any]) -> Answers:
@@ -86,7 +115,7 @@ class JevClient:
         body = {"model": self.model, "state": state, "questions": questions}
         deadline = time.monotonic() + self.timeout
         last = "no attempt made"
-        for attempt in range(3):
+        for attempt in range(_ATTEMPTS):
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 break
@@ -101,7 +130,8 @@ class JevClient:
                 last = f"HTTP {resp.status_code}"
                 if resp.status_code not in _RETRY_STATUS:
                     break
-            time.sleep(min(0.3 * 2**attempt, max(deadline - time.monotonic(), 0)))
+            if attempt < _ATTEMPTS - 1:
+                time.sleep(min(0.3 * 2**attempt, max(deadline - time.monotonic(), 0)))
         raise JevError(f"Jev unavailable ({last})")
 
     @staticmethod

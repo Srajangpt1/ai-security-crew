@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed — asc-guard hardening
+- The protected-file rule is much harder to get around. It now catches redirects after read-only commands (`cat x > .mcp.json`), `sh -c`/`eval`/`pwsh`/`cmd /c` wrappers including PowerShell's `-EncodedCommand`, interpreter one-liners and heredocs, `cd` followed by a relative path, globs and brace expansion, backslash paths, removing or replacing a config folder, different case (macOS), symlinks, a `target_file` argument and filesystem MCP servers. VS Code, Claude Desktop, Cursor hook scripts and the new Windsurf path are protected too. A command too long to check before the hook times out is blocked.
+- The protected-file rule runs before anything else, so a bad `ASC_GUARD_*` setting can no longer switch it off.
+- A malformed answer from Jev, an unreadable session file or a failure to save session state no longer crash the hook; the warning about injected content still reaches the agent when saving fails. Any unexpected error fails open with a message instead of a traceback.
+- The hook reads its input as UTF-8 whatever the console code page, so non-English prompts are no longer garbled on Windows.
+- `install` writes the full path of a lasting `asc-guard` (or of `uvx` when it runs from a throwaway uvx environment) instead of a bare name that the client may not find. It accepts files saved with a byte order mark, keeps the file's permissions, writes through symlinks, never truncates a file when a write fails, and refuses a file it would have to discard parts of.
+- No wasted wait after the last failed Jev attempt.
+
 ### Changed — plugin packaging
 - The Claude Code plugin now registers the MCP server (`sec-review`), so one install gives the tools, the skills and the guard hooks.
 - The guard hooks check for `TYPESAFE_API_KEY` (or `ASC_GUARD_ENABLE`) before starting `uvx`. Without a key they exit at once instead of adding about a second to every tool call. `asc-guard install` writes the same check.
