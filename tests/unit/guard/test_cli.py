@@ -84,8 +84,16 @@ def test_install_rejects_broken_json(tmp_path: Path) -> None:
 
 
 def test_plugin_hooks_file_matches_the_installer() -> None:
+    """The asc-guard-managed events in hooks.json must match the installer.
+
+    hooks.json also carries a SessionStart entry for the fetch-intel
+    prefetch, which build_hooks (asc-guard's own events only) does not
+    generate, so this checks those events rather than the whole file.
+    """
     plugin = Path(__file__).parents[3] / "hooks" / "hooks.json"
-    assert json.loads(plugin.read_text()) == {"hooks": build_hooks(UVX_PREFIX)}
+    hooks = json.loads(plugin.read_text())["hooks"]
+    for event, groups in build_hooks(UVX_PREFIX).items():
+        assert hooks[event] == groups
 
 
 @pytest.mark.parametrize(

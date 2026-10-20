@@ -17,3 +17,15 @@ is original.
 
 All other code, including everything under src/mcp_security_review/security/
 and src/mcp_security_review/providers/sca/, is original to this project.
+
+This project fetches MITRE ATT&CK technique, group, and software ids and data
+at runtime from the ATT&CK STIX repository (https://github.com/mitre/cti),
+subject to the ATT&CK Terms of Use (https://attack.mitre.org/resources/terms-of-use/),
+and fetches mapping data at runtime from the Center for Threat-Informed
+Defense (CTID) Mappings Explorer (https://github.com/center-for-threat-informed-defense/mappings-explorer),
+licensed under the Apache License 2.0. Only identifiers are used; all
+descriptive text is original.
+
+This project imports the `cvss` package (https://pypi.org/project/cvss/)
+unmodified, licensed under the GNU Lesser General Public License v3.0 or
+later (LGPL-3.0+).

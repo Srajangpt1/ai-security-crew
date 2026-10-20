@@ -79,3 +79,6 @@ skills-workspace/
 # Claude (ignore personal settings, track shared commands/skills)
 .claude/settings.local.json
 .claude/settings.json
+
+# Local agent workflow scratch (plans ledger, briefs, reports)
+.superpowers/

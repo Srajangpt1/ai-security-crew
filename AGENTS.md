@@ -27,25 +27,30 @@ This file provides guidance for autonomous coding agents working inside the **AI
 > **Note**: This workflow is also delivered to end users automatically via the MCP server's `instructions` field on connect. Changes here should stay in sync with `servers/main.py`.
 
 ### Before starting any coding task
+- New to a repo? Call `general_project_context` first. It detects the stack (languages, frameworks, Terraform, Actions, Dockerfiles) and suggests `components`.
 - Call `general_lightweight_security_review` with the task description. It returns a menu of components. Call it again with `components` set to the ids this change adds or modifies (usually 2 to 5) (and `data_handled` for credentials, payments, or personal data) to get the threats and countermeasures.
 - If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), fetch it first with the matching MCP server you have connected and pass its details as the task description.
 - For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model` with the same `components`.
 
 ### When adding or updating packages
-Run both steps before writing code that uses the new packages:
+Run these steps before writing code that uses the new packages:
 
-1. **Verify packages exist** — call `sca_verify_packages`. Fix any invalid packages before proceeding.
-2. **Scan for vulnerabilities** — call `sca_scan_dependencies` in parallel with `general_verify_code_security`, passing the packages. Each finding has a `reachability_check` (affected symbols and a question). Answer it from your own code and act:
+1. **Verify packages exist** — call `sca_verify_packages`. It also checks GitHub Actions refs and container images and flags unpinned ones. Fix any invalid packages before proceeding.
+2. **Assess new libraries** — before adopting a brand-new dependency, call `sca_assess_packages` for its license, provenance, OpenSSF Scorecard, and dependency-tree signal.
+3. **Scan for vulnerabilities** — call `sca_scan_dependencies` in parallel with `general_verify_code_security`, passing the packages. Upgrade every id in `upgrade_now` (known exploited or likely to be exploited) regardless of reachability. Every other finding has a `reachability_check` (affected symbols and a question). Answer it from your own code and act:
    - symbols are used, or you cannot tell → upgrade to the fixed version or avoid the symbol before continuing
    - symbols are not used → note it and continue; consider upgrading anyway
 
-Both SCA tools accept a JSON array of `{"name", "version", "ecosystem"}` objects (`"pypi"` or `"npm"`).
+All SCA tools take a JSON array of `{"name", "version", "ecosystem"}` objects. Ecosystems: `"pypi"`, `"npm"`, `"github-actions"`, and `"container"` (`"container"` in `sca_verify_packages` only).
+
+- Already have a CVE or GHSA id? Call `sca_lookup_vulnerability` instead of re-scanning.
+- Need attacker detail for an ATT&CK id from a review or scan? Call `threatmodel_attack_technique`.
 
 ### After generating code
 - Call `general_verify_code_security` with the same `components`. Do not paste code: it returns a checklist, and you review the code you wrote against it. Follow the `review_prompt` in the response and report findings.
 
 ### Persisting threat models
-- After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.
+- After `threatmodel_perform_threat_model`, and only once the user agrees, call `threatmodel_update_threat_model_file` to write `threat-model.md`. It is a write tool, so it is refused in read-only mode.
 - If earlier threat models exist in a wiki or docs tool you have connected, fetch them first and pass them as `previous_models_json` to avoid duplicating work.
 
 ---
@@ -69,7 +74,7 @@ uv run pytest                        # run full test suite
 
 **Architecture**:
 - **Servers**: One FastMCP sub-server per area (`general`, `threatmodel`, `sca`), mounted in `servers/main.py`
-- **Providers**: External lookups (OSV, PyPI, npm) live in `providers/`
+- **Providers**: External lookups (OSV, PyPI, npm, GitHub, OCI registries, deps.dev, Scorecard, CISA KEV, EPSS, MITRE ATT&CK) live in `providers/`
 - **Tickets and docs**: No Jira/Confluence code here; agents fetch tickets with whatever MCP server the user has connected
 
 ---

@@ -7,7 +7,7 @@ from .library import (
     UnknownComponentError,
     describe,
 )
-from .loader import LibraryError, load_library
+from .loader import LibraryError, builtin_library, load_library
 from .models import Component, Countermeasure, Severity, Threat
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "Severity",
     "Threat",
     "UnknownComponentError",
+    "builtin_library",
     "describe",
     "load_library",
 ]

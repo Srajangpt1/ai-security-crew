@@ -85,7 +85,7 @@ def run(
         guard=guard.name,
         dataset=str(cases_path),
         dataset_revision=dataset_revision(cases_path),
-        date=datetime.datetime.now(datetime.timezone.utc).date().isoformat(),
+        date=datetime.datetime.now(datetime.UTC).date().isoformat(),
         trials=trials,
         cases=len(cases),
         thresholds={k: float(v) for k, v in thresholds.items()},

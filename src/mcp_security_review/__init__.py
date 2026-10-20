@@ -33,7 +33,7 @@ logger = setup_logging(logging_level, logging_stream)
 
 
 @click.version_option(__version__, prog_name="mcp-security-review")
-@click.command()
+@click.group(invoke_without_command=True)
 @click.option(
     "-v",
     "--verbose",
@@ -73,7 +73,9 @@ logger = setup_logging(logging_level, logging_stream)
     "--enabled-tools",
     help="Comma-separated list of tools to enable (enables all if not specified)",
 )
+@click.pass_context
 def main(
+    ctx: click.Context,
     verbose: int,
     env_file: str | None,
     transport: str,
@@ -89,6 +91,10 @@ def main(
     Quickly assess risks, check dependencies, and model threats without breaking
     rhythm.
     """
+    if ctx.invoked_subcommand is not None:
+        # A subcommand (e.g. fetch-intel) handles its own behaviour.
+        return
+
     # Logging level logic
     if verbose == 1:
         current_logging_level = logging.INFO
@@ -232,6 +238,30 @@ def main(
         sys.exit(1)
     finally:
         ensure_clean_exit()
+
+
+@main.command("fetch-intel")
+@click.option(
+    "--force", is_flag=True, help="Refetch sources even if the cache is still fresh."
+)
+@click.option("--quiet", is_flag=True, help="Suppress per-source status output.")
+def fetch_intel_command(force: bool, quiet: bool) -> None:
+    """Refresh the cached KEV, CTID, and ATT&CK threat-intel sources.
+
+    Always exits 0: a source failure is reported per line, not fatal, so
+    this is safe to run unattended (e.g. from a SessionStart hook).
+    """
+    from mcp_security_review.providers.intel import fetch_intel as run_fetch_intel
+
+    try:
+        statuses = asyncio.run(run_fetch_intel(force=force))
+    except Exception:  # defensive: this command must always exit 0
+        logger.exception("fetch-intel failed unexpectedly")
+        statuses = {}
+
+    if not quiet:
+        for source, status in statuses.items():
+            click.echo(f"{source}: {status}")
 
 
 __all__ = ["main", "__version__"]

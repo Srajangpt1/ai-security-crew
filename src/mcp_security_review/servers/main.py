@@ -7,10 +7,12 @@ from typing import Any
 
 from fastmcp import FastMCP
 from fastmcp.tools import Tool as FastMCPTool
+from mcp.types import EmbeddedResource, ImageContent, TextContent
 from mcp.types import Tool as MCPTool
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from mcp_security_review.errors import tool_error
 from mcp_security_review.utils.io import is_read_only_mode
 from mcp_security_review.utils.tools import get_enabled_tools, should_include_tool
 
@@ -103,29 +105,89 @@ class SecurityReviewMCP(FastMCP[MainAppContext]):
         )
         return filtered_tools
 
+    async def _mcp_call_tool(
+        self, key: str, arguments: dict[str, Any]
+    ) -> list[TextContent | ImageContent | EmbeddedResource]:
+        """Call a tool, refusing ones that the list filters would hide.
+
+        Hiding a tool from the list does not stop a client from calling it by
+        name, so the ENABLED_TOOLS filter and read-only mode are checked again
+        here, from the environment at call time.
+
+        Args:
+            key: The registered tool name, such as `sca_verify_packages`.
+            arguments: The tool arguments.
+
+        Returns:
+            The tool result, or a `tool_disabled` / `read_only_mode` error.
+        """
+        if not should_include_tool(key, get_enabled_tools()):
+            return _refusal(
+                "tool_disabled",
+                f"{key} is not in this server's ENABLED_TOOLS list.",
+                "Use one of the listed tools, or ask the user to enable this one.",
+            )
+        if is_read_only_mode():
+            tool = (await self.get_tools()).get(key)
+            if tool is not None and "write" in tool.tags:
+                return _refusal(
+                    "read_only_mode",
+                    f"This server runs in read-only mode, so {key} is disabled.",
+                    "Ask the user to restart without --read-only or READ_ONLY_MODE.",
+                )
+        return await super()._mcp_call_tool(key, arguments)
+
+
+def _refusal(code: str, message: str, hint: str) -> list[TextContent]:
+    """Wrap a tool error as the content list an MCP tool call returns."""
+    return [TextContent(type="text", text=tool_error(code, message, hint))]
+
+
+# Claude Code shows at most this many characters of server instructions, so
+# the most important steps come first.
+INSTRUCTIONS_LIMIT = 2048
 
 AGENT_INSTRUCTIONS = (
-    "# Security Review MCP — Agent Workflow\n\n"
-    "Follow this workflow whenever you write or modify code.\n\n"
-    "## 1. Before you start coding\n"
-    "Call `general_lightweight_security_review` with a description of what you're building. It returns a menu of components (file upload, database, login, and so on).\n"  # noqa: E501
-    "- Call it a second time with the same description and `components` set to the ids of the components this change adds or directly modifies, usually 2 to 5 (add `data_handled` for credentials, payments, or personal data). The second call returns the threats to guard against and the countermeasures to build in.\n"  # noqa: E501
-    "- Use this for any non-trivial coding task to identify risks upfront.\n"  # noqa: E501
-    "- If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, Notion, and so on), fetch it first with the matching MCP server you have connected, then pass its summary, description, and acceptance criteria as the task description.\n"  # noqa: E501
-    "- For significant new features (auth, file handling, external integrations), also call `threatmodel_perform_threat_model` with the same `components`.\n\n"  # noqa: E501
+    "# Security Review MCP: agent workflow\n"
+    "\n"
+    "Follow this whenever you write or modify code.\n"
+    "\n"
+    "## 1. Before coding\n"
+    "- New to a repo? Call `general_project_context` first: it detects the stack "
+    "and suggests `components`.\n"
+    "- Call `general_lightweight_security_review` with the task description to get "
+    "the component menu. Call it a second time with `components` set to the ids "
+    "this change adds or modifies (usually 2 to 5; add `data_handled` for "
+    "credentials, payments, or personal data) to get the threats and "
+    "countermeasures to build in.\n"
+    "- If the task comes from a ticket or page link (Jira, Linear, GitHub issues, "
+    "and so on), fetch it first with the matching MCP server you have connected "
+    "and pass its details as the task description.\n"
+    "- For significant features (auth, file handling, external integrations), also "
+    "call `threatmodel_perform_threat_model` with the same `components`.\n"
+    "\n"
     "## 2. When adding or updating dependencies\n"
-    "Run both steps before writing any code that uses the new packages:\n"
-    "1. Call `sca_verify_packages` — confirms packages exist with valid versions. Fix any invalid packages before proceeding.\n"  # noqa: E501
-    "2. Call `sca_scan_dependencies` in parallel with step 3 — scans for CVEs. Each finding has a `reachability_check`; answer it from your own code:\n"  # noqa: E501
-    "   - affected symbols are used, or you cannot tell → upgrade to the fixed version or avoid the symbol before continuing.\n"  # noqa: E501
-    "   - symbols are not used → note it and continue; consider upgrading anyway.\n\n"  # noqa: E501
+    "Before writing code that uses them:\n"
+    "1. `sca_verify_packages` confirms packages exist (pypi, npm) and checks "
+    "GitHub Actions refs and container images, flagging unpinned ones. Fix invalid "
+    "entries first.\n"
+    "2. New library? `sca_assess_packages` for license, provenance, and "
+    "Scorecard.\n"
+    "3. `sca_scan_dependencies`: upgrade everything in `upgrade_now` regardless of "
+    "reachability. For other findings answer the `reachability_check`: symbols "
+    "used or unsure -> upgrade or avoid them; unused -> note it and continue.\n"
+    "- Known CVE or GHSA id? `sca_lookup_vulnerability` instead of re-scanning.\n"
+    "- Attacker detail for an ATT&CK id? `threatmodel_attack_technique`.\n"
+    "\n"
     "## 3. After generating code\n"
-    "Call `general_verify_code_security` with the same `components`. Do not paste code: it returns a checklist, and you review the code you wrote against it.\n"  # noqa: E501
-    "- Run this after every non-trivial code generation before presenting results to the user.\n"  # noqa: E501
-    "- Follow the `review_prompt` in the response, check each item against your code, and report findings.\n\n"  # noqa: E501
-    "## 4. Persisting threat models (optional)\n"
-    "After `threatmodel_perform_threat_model`, call `threatmodel_update_threat_model_file` to write `threat-model.md`.\n"  # noqa: E501
-    "If earlier threat models or design pages exist in a wiki or docs tool you have connected, fetch them first and pass them as `previous_models_json` to avoid duplicating work.\n"  # noqa: E501
+    "Call `general_verify_code_security` with the same `components`. Do not paste "
+    "code: it returns a checklist; review the code you wrote against it, follow "
+    "its `review_prompt`, and report findings.\n"
+    "\n"
+    "## 4. Persisting threat models\n"
+    "Only after the user agrees, call `threatmodel_update_threat_model_file` to "
+    "write `threat-model.md`. Fetch earlier models from a connected wiki first and "
+    "pass them as `previous_models_json`.\n"
 )
 
 main_mcp = SecurityReviewMCP(

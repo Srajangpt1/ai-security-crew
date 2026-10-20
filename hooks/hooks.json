@@ -34,6 +34,17 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -z \"$MCP_SECURITY_REVIEW_NO_PREFETCH\" ] || exit 0; (uvx --from git+https://github.com/Srajangpt1/ai-security-crew mcp-security-review fetch-intel --quiet >/dev/null 2>&1 &) ; exit 0",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

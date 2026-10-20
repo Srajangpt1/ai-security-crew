@@ -7,6 +7,8 @@
 #                 | denial-of-service | elevation-of-privilege
 #   cwe           CWE ids, format CWE-<number> (may be empty)
 #   mcp_top10     (optional) OWASP MCP Top 10 2025 ids, such as "MCP06:2025"
+#   attack        (optional) current MITRE ATT&CK Enterprise technique ids,
+#                 such as T1190 or T1078.004 (never revoked or deprecated)
 #   countermeasures  ids from countermeasures.yaml that mitigate it
 threats:
   # ---- Web or API endpoint -------------------------------------------------
@@ -32,6 +34,7 @@ threats:
     severity: medium
     stride: [denial-of-service]
     cwe: [CWE-770]
+    attack: [T1110, T1499]
     countermeasures: [rate-limiting]
 
   - id: missing-security-headers
@@ -56,6 +59,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege, tampering]
     cwe: [CWE-915]
+    attack: [T1190]
     countermeasures: [allow-list-fields, check-permissions-server-side]
 
   - id: excessive-data-exposure
@@ -72,6 +76,7 @@ threats:
     severity: medium
     stride: [tampering]
     cwe: [CWE-20]
+    attack: [T1190]
     countermeasures: [server-side-validation]
 
   - id: business-flow-bypass
@@ -89,6 +94,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-307]
+    attack: [T1110.004]
     countermeasures: [login-attempt-limits, breached-password-check, offer-mfa]
 
   - id: weak-password-storage
@@ -97,6 +103,7 @@ threats:
     severity: critical
     stride: [information-disclosure]
     cwe: [CWE-916]
+    attack: [T1110.002]
     countermeasures: [slow-password-hashing]
 
   - id: weak-password-rules
@@ -105,6 +112,7 @@ threats:
     severity: medium
     stride: [spoofing]
     cwe: [CWE-521]
+    attack: [T1110.001]
     countermeasures: [sensible-password-rules, breached-password-check]
 
   - id: insecure-password-reset
@@ -113,6 +121,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-640]
+    attack: [T1078]
     countermeasures: [secure-reset-flow]
 
   - id: default-accounts
@@ -121,6 +130,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-798]
+    attack: [T1078.001]
     countermeasures: [remove-default-accounts]
 
   - id: no-second-factor
@@ -129,6 +139,7 @@ threats:
     severity: medium
     stride: [spoofing]
     cwe: [CWE-308]
+    attack: [T1078]
     countermeasures: [offer-mfa]
 
   - id: user-enumeration
@@ -146,6 +157,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-384]
+    attack: [T1550.004]
     countermeasures: [new-session-on-login]
 
   - id: predictable-tokens
@@ -154,6 +166,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-330]
+    attack: [T1606]
     countermeasures: [crypto-random-tokens]
 
   - id: sessions-not-ended
@@ -162,6 +175,7 @@ threats:
     severity: medium
     stride: [spoofing]
     cwe: [CWE-613]
+    attack: [T1550.001]
     countermeasures: [proper-logout-and-expiry]
 
   - id: insecure-cookie-flags
@@ -170,6 +184,7 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-614, CWE-1004]
+    attack: [T1539]
     countermeasures: [secure-cookie-attributes]
 
   - id: jwt-tampering
@@ -178,6 +193,7 @@ threats:
     severity: high
     stride: [spoofing, elevation-of-privilege]
     cwe: [CWE-347]
+    attack: [T1606]
     countermeasures: [verify-token-signature]
 
   - id: token-claims-unchecked
@@ -186,6 +202,7 @@ threats:
     severity: medium
     stride: [spoofing]
     cwe: [CWE-345]
+    attack: [T1550.001]
     countermeasures: [validate-token-claims]
 
   - id: tokens-leak-via-url-or-storage
@@ -194,6 +211,7 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-598]
+    attack: [T1528, T1539]
     countermeasures: [no-secrets-in-urls, no-sensitive-data-in-browser-storage]
 
   # ---- Permissions and data access -----------------------------------------
@@ -203,6 +221,7 @@ threats:
     severity: critical
     stride: [elevation-of-privilege]
     cwe: [CWE-862]
+    attack: [T1190]
     countermeasures: [check-permissions-server-side]
 
   - id: object-id-guessing
@@ -211,6 +230,7 @@ threats:
     severity: high
     stride: [information-disclosure, tampering]
     cwe: [CWE-639]
+    attack: [T1190]
     countermeasures: [per-object-authorization]
 
   - id: role-self-assignment
@@ -219,6 +239,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege]
     cwe: [CWE-269]
+    attack: [T1098]
     countermeasures: [allow-list-fields, check-permissions-server-side]
 
   - id: tenant-data-leak
@@ -236,6 +257,7 @@ threats:
     severity: critical
     stride: [tampering, information-disclosure]
     cwe: [CWE-89]
+    attack: [T1190]
     countermeasures: [parameterized-queries]
 
   - id: nosql-injection
@@ -244,6 +266,7 @@ threats:
     severity: high
     stride: [tampering, information-disclosure]
     cwe: [CWE-943]
+    attack: [T1190]
     countermeasures: [parameterized-queries, server-side-validation]
 
   - id: over-privileged-db-account
@@ -269,6 +292,7 @@ threats:
     severity: high
     stride: [elevation-of-privilege]
     cwe: [CWE-434]
+    attack: [T1505.003, T1190]
     countermeasures: [upload-allow-list, upload-rename-and-isolate]
 
   - id: upload-path-traversal
@@ -277,6 +301,7 @@ threats:
     severity: high
     stride: [tampering]
     cwe: [CWE-22]
+    attack: [T1190]
     countermeasures: [upload-rename-and-isolate]
 
   - id: upload-resource-exhaustion
@@ -285,6 +310,7 @@ threats:
     severity: medium
     stride: [denial-of-service]
     cwe: [CWE-770]
+    attack: [T1499.003]
     countermeasures: [upload-size-limits]
 
   - id: upload-active-content
@@ -293,16 +319,18 @@ threats:
     severity: medium
     stride: [tampering]
     cwe: [CWE-79]
+    attack: [T1189]
     countermeasures: [serve-uploads-safely, sanitize-html]
 
   # ---- Object or file storage -----------------------------------------------
   - id: public-bucket
     name: Storage bucket is publicly listable or readable
-    components: [object-storage]
+    components: [object-storage, cloud-storage]
     severity: high
     stride: [information-disclosure]
     cwe: [CWE-732]
-    countermeasures: [private-storage-signed-urls]
+    attack: [T1530]
+    countermeasures: [private-storage-signed-urls, block-public-storage-access]
 
   - id: long-lived-storage-credentials
     name: Long-lived storage keys are shipped to the browser or mobile app
@@ -310,6 +338,7 @@ threats:
     severity: high
     stride: [information-disclosure, tampering]
     cwe: [CWE-798]
+    attack: [T1552.001, T1078.004]
     countermeasures: [short-lived-scoped-credentials]
 
   # ---- Outbound HTTP calls ---------------------------------------------------
@@ -319,6 +348,7 @@ threats:
     severity: high
     stride: [information-disclosure, elevation-of-privilege]
     cwe: [CWE-918]
+    attack: [T1190, T1552.005]
     countermeasures: [ssrf-allow-list, no-redirect-following]
 
   - id: tls-verification-disabled
@@ -327,6 +357,7 @@ threats:
     severity: high
     stride: [spoofing, information-disclosure]
     cwe: [CWE-295]
+    attack: [T1557]
     countermeasures: [validate-tls-certificates]
 
   - id: no-timeouts-or-size-caps
@@ -335,6 +366,7 @@ threats:
     severity: low
     stride: [denial-of-service]
     cwe: [CWE-400]
+    attack: [T1499]
     countermeasures: [timeouts-and-size-caps]
 
   # ---- Incoming webhooks -----------------------------------------------------
@@ -361,6 +393,7 @@ threats:
     severity: high
     stride: [tampering]
     cwe: [CWE-602]
+    attack: [T1565]
     countermeasures: [server-side-pricing]
 
   - id: double-processing
@@ -394,6 +427,7 @@ threats:
     severity: critical
     stride: [information-disclosure]
     cwe: [CWE-798]
+    attack: [T1552.001]
     countermeasures: [secrets-manager]
 
   - id: debug-mode-in-production
@@ -402,6 +436,7 @@ threats:
     severity: high
     stride: [information-disclosure, elevation-of-privilege]
     cwe: [CWE-489]
+    attack: [T1190]
     countermeasures: [disable-debug-in-prod]
 
   - id: exposed-config-files
@@ -410,6 +445,7 @@ threats:
     severity: high
     stride: [information-disclosure]
     cwe: [CWE-538]
+    attack: [T1552.001]
     countermeasures: [no-vcs-or-env-files-deployed, secrets-manager]
 
   # ---- Cryptography and transport --------------------------------------------
@@ -427,6 +463,7 @@ threats:
     severity: high
     stride: [information-disclosure, spoofing]
     cwe: [CWE-321]
+    attack: [T1552.001, T1606]
     countermeasures: [secrets-manager, separate-keys-per-environment]
 
   - id: weak-random-generator
@@ -435,6 +472,7 @@ threats:
     severity: high
     stride: [spoofing]
     cwe: [CWE-338]
+    attack: [T1606]
     countermeasures: [crypto-random-tokens]
 
   - id: cleartext-transport
@@ -443,6 +481,7 @@ threats:
     severity: high
     stride: [information-disclosure, tampering]
     cwe: [CWE-319]
+    attack: [T1040, T1557]
     countermeasures: [https-everywhere]
 
   - id: outdated-tls
@@ -451,6 +490,7 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-327]
+    attack: [T1557]
     countermeasures: [modern-tls-config]
 
   # ---- User-generated content and browser frontend ---------------------------
@@ -460,6 +500,7 @@ threats:
     severity: high
     stride: [tampering, information-disclosure]
     cwe: [CWE-79]
+    attack: [T1189]
     countermeasures: [output-encoding, sanitize-html]
 
   - id: dom-xss
@@ -468,6 +509,7 @@ threats:
     severity: high
     stride: [tampering, information-disclosure]
     cwe: [CWE-79]
+    attack: [T1189]
     countermeasures: [safe-dom-apis, output-encoding]
 
   - id: third-party-script-compromise
@@ -476,6 +518,7 @@ threats:
     severity: medium
     stride: [tampering]
     cwe: [CWE-829]
+    attack: [T1195.002, T1189]
     countermeasures: [subresource-integrity, security-headers]
 
   # ---- Background jobs -------------------------------------------------------
@@ -502,6 +545,7 @@ threats:
     severity: critical
     stride: [elevation-of-privilege]
     cwe: [CWE-502]
+    attack: [T1190]
     countermeasures: [avoid-unsafe-deserializers]
 
   - id: xxe
@@ -510,6 +554,7 @@ threats:
     severity: high
     stride: [information-disclosure]
     cwe: [CWE-611]
+    attack: [T1190]
     countermeasures: [disable-xml-external-entities]
 
   - id: archive-path-traversal
@@ -518,6 +563,7 @@ threats:
     severity: high
     stride: [tampering]
     cwe: [CWE-22]
+    attack: [T1190]
     countermeasures: [safe-archive-extraction]
 
   # ---- OS commands and dynamic code ------------------------------------------
@@ -527,6 +573,7 @@ threats:
     severity: critical
     stride: [elevation-of-privilege]
     cwe: [CWE-78]
+    attack: [T1190, T1059]
     countermeasures: [avoid-shell-and-eval]
 
   - id: code-injection
@@ -535,6 +582,7 @@ threats:
     severity: critical
     stride: [elevation-of-privilege]
     cwe: [CWE-94]
+    attack: [T1190, T1059]
     countermeasures: [avoid-shell-and-eval]
 
   # ---- Email and notifications -----------------------------------------------
@@ -560,6 +608,7 @@ threats:
     severity: medium
     stride: [denial-of-service]
     cwe: [CWE-770]
+    attack: [T1496.004]
     countermeasures: [rate-limiting]
 
   # ---- Packages and dependencies ---------------------------------------------
@@ -569,6 +618,7 @@ threats:
     severity: high
     stride: [tampering]
     cwe: [CWE-1357]
+    attack: [T1195.001]
     countermeasures: [verify-packages-exist]
 
   - id: typosquatted-package
@@ -577,6 +627,7 @@ threats:
     severity: high
     stride: [tampering]
     cwe: [CWE-1357]
+    attack: [T1195.001]
     countermeasures: [verify-packages-exist, pin-and-lock-dependencies]
 
   - id: vulnerable-dependency
@@ -585,40 +636,283 @@ threats:
     severity: high
     stride: [elevation-of-privilege, tampering]
     cwe: [CWE-1395]
+    attack: [T1190]
     countermeasures: [scan-and-update-dependencies, pin-and-lock-dependencies]
 
-  # ---- Containers and infrastructure -----------------------------------------
+  # ---- Cloud network --------------------------------------------------------
+  - id: admin-ports-open-to-internet
+    name: SSH, RDP, or another admin port is open to 0.0.0.0/0 or ::/0
+    components: [cloud-network]
+    severity: high
+    stride: [spoofing, elevation-of-privilege]
+    cwe: [CWE-284]
+    attack: [T1133, T1021, T1110]
+    countermeasures: [restrict-admin-ingress]
+
+  - id: unrestricted-egress
+    name: Workloads may connect out to any address, so a compromised host can call home or exfiltrate freely
+    components: [cloud-network]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-284]
+    attack: [T1048, T1071, T1567]
+    countermeasures: [restrict-egress]
+
+  - id: public-ip-on-instance
+    name: A server gets a public IP address and is reachable straight from the internet
+    components: [cloud-network, cloud-compute]
+    severity: medium
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-668]
+    attack: [T1190, T1133]
+    countermeasures: [no-public-ip-on-instances, restrict-admin-ingress]
+
+  - id: weak-load-balancer-tls
+    name: A load balancer listener accepts plain HTTP or old TLS versions and ciphers
+    components: [cloud-network]
+    severity: medium
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-319, CWE-326]
+    attack: [T1557, T1040]
+    countermeasures: [lb-tls-policy]
+
+  - id: network-traffic-not-logged
+    name: Load balancer requests and network flows are not logged, so an incident cannot be traced
+    components: [cloud-network, cloud-encryption-and-logging]
+    severity: low
+    stride: [repudiation]
+    cwe: [CWE-778]
+    countermeasures: [lb-access-logs, vpc-flow-logs]
+
+  # ---- Cloud servers --------------------------------------------------------
+  - id: imds-credential-theft
+    name: An SSRF bug or code on a server reads the role credentials from the instance metadata service
+    components: [cloud-compute, cloud-iam]
+    severity: high
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-522]
+    attack: [T1552.005]
+    countermeasures: [require-imdsv2, instance-role-least-privilege]
+
+  - id: secrets-in-iac-config
+    name: Secrets are written into user data, Terraform variables, outputs, or provider blocks
+    components: [cloud-compute, cloud-data-store, secrets-and-config]
+    severity: high
+    stride: [information-disclosure]
+    cwe: [CWE-798, CWE-312]
+    attack: [T1552.001, T1552.005]
+    countermeasures: [no-secrets-in-user-data-or-tf-config, secrets-manager]
+
+  - id: unencrypted-block-storage
+    name: Server disks and their snapshots are not encrypted, so a shared or copied snapshot exposes the data
+    components: [cloud-compute, cloud-encryption-and-logging]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-311]
+    attack: [T1537]
+    countermeasures: [encrypt-block-storage]
+
+  # ---- Cloud IAM ------------------------------------------------------------
+  - id: overbroad-cloud-permissions
+    name: Cloud roles or service accounts allow far more than the app needs
+    components: [cloud-iam]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-269]
+    attack: [T1078.004, T1098]
+    countermeasures: [least-privilege-iam]
+
+  - id: overbroad-instance-role
+    name: The role attached to a server or function can do far more than that workload needs
+    components: [cloud-iam, cloud-compute]
+    severity: high
+    stride: [elevation-of-privilege]
+    cwe: [CWE-250]
+    attack: [T1078.004, T1552.005]
+    countermeasures: [instance-role-least-privilege, least-privilege-iam]
+
+  - id: long-lived-cloud-keys
+    name: Long-lived cloud access keys sit in CI secrets or config instead of short-lived federated credentials
+    components: [ci-pipeline, cloud-iam]
+    severity: high
+    stride: [spoofing, information-disclosure]
+    cwe: [CWE-522]
+    attack: [T1078.004, T1552]
+    countermeasures: [ci-oidc-federation]
+
+  # ---- Cloud buckets --------------------------------------------------------
+  - id: unencrypted-bucket
+    name: Bucket objects are stored without a managed key or can be fetched over plain HTTP
+    components: [cloud-storage, cloud-encryption-and-logging]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-311, CWE-319]
+    attack: [T1530]
+    countermeasures: [encrypt-buckets-with-kms]
+
+  - id: bucket-changes-unrecoverable
+    name: Objects can be overwritten or deleted with no older version to restore and no access log to investigate
+    components: [cloud-storage]
+    severity: medium
+    stride: [tampering, repudiation]
+    cwe: [CWE-778]
+    attack: [T1485, T1486]
+    countermeasures: [bucket-versioning-and-access-logs]
+
+  # ---- Cloud databases and queues -------------------------------------------
+  - id: exposed-data-store
+    name: A database, cache, or admin port is reachable from the internet
+    components: [cloud-data-store, cloud-network, database]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-668]
+    attack: [T1190]
+    countermeasures: [private-network-for-data-stores]
+
+  - id: database-tls-not-enforced
+    name: The database accepts unencrypted connections, or clients connect without checking its certificate
+    components: [cloud-data-store]
+    severity: medium
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-319, CWE-295]
+    attack: [T1040, T1557]
+    countermeasures: [enforce-db-tls]
+
+  - id: unencrypted-data-store
+    name: Databases, queues, topics, secrets, or log groups are stored without a managed encryption key
+    components: [cloud-data-store, cloud-encryption-and-logging]
+    severity: medium
+    stride: [information-disclosure]
+    cwe: [CWE-311]
+    attack: [T1537]
+    countermeasures: [encrypt-databases-at-rest, encrypt-queues-topics-and-logs]
+
+  - id: data-store-loss
+    name: A database or table is deleted or corrupted with no backup, point-in-time recovery, or deletion protection
+    components: [cloud-data-store]
+    severity: high
+    stride: [denial-of-service, tampering]
+    attack: [T1485, T1486]
+    countermeasures: [db-backups-and-deletion-protection]
+
+  # ---- Cloud keys, audit logs, and state ------------------------------------
+  - id: cloud-audit-trail-gaps
+    name: Cloud API activity is not recorded in every region, or the audit log can be changed or deleted unnoticed
+    components: [cloud-encryption-and-logging, cloud-iam]
+    severity: medium
+    stride: [repudiation]
+    cwe: [CWE-778]
+    attack: [T1685.002]
+    countermeasures: [audit-trail-all-regions]
+
+  - id: kms-keys-unmanaged
+    name: Encryption keys never rotate, or their key policy lets any principal use or manage them
+    components: [cloud-encryption-and-logging]
+    severity: medium
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-324, CWE-732]
+    countermeasures: [rotate-and-scope-kms-keys]
+
+  - id: terraform-state-exposed
+    name: Terraform state, which holds secrets in plain text, sits in a readable, unencrypted, or unlocked backend
+    components: [cloud-encryption-and-logging, cloud-storage, secrets-and-config]
+    severity: high
+    stride: [information-disclosure, tampering]
+    cwe: [CWE-312, CWE-538]
+    attack: [T1552.001, T1530]
+    countermeasures: [secure-terraform-state]
+
+  # ---- Container image ------------------------------------------------------
   - id: container-runs-as-root
     name: The container runs as root, so an app flaw becomes host-level access
-    components: [container-and-iac]
+    components: [container-image, kubernetes]
     severity: medium
     stride: [elevation-of-privilege]
     cwe: [CWE-250]
+    attack: [T1611]
     countermeasures: [non-root-minimal-images]
 
   - id: secrets-baked-into-image
     name: Secrets are copied into the image or passed as build arguments
-    components: [container-and-iac, secrets-and-config]
+    components: [container-image, secrets-and-config]
     severity: high
     stride: [information-disclosure]
     cwe: [CWE-540]
-    countermeasures: [secrets-manager]
+    attack: [T1552.001]
+    countermeasures: [build-secrets-not-in-layers, secrets-manager]
 
-  - id: overbroad-cloud-permissions
-    name: Cloud roles or service accounts allow far more than the app needs
-    components: [container-and-iac]
+  - id: unpinned-base-image
+    name: Images are pulled by a mutable tag, so a rebuild or redeploy can silently get a different or poisoned image
+    components: [container-image, kubernetes]
+    severity: medium
+    stride: [tampering]
+    cwe: [CWE-494, CWE-829]
+    attack: [T1525, T1195.002]
+    countermeasures: [pin-images-by-digest]
+
+  # ---- Kubernetes -----------------------------------------------------------
+  - id: privileged-pod
+    name: A pod runs privileged, shares host namespaces, or has a writable root filesystem, making container escape easy
+    components: [kubernetes]
     severity: high
     stride: [elevation-of-privilege]
-    cwe: [CWE-269]
-    countermeasures: [least-privilege-iam]
+    cwe: [CWE-250]
+    attack: [T1611, T1610]
+    countermeasures: [restrict-pod-security-context]
 
-  - id: exposed-data-store
-    name: A database, cache, or admin port is reachable from the internet
-    components: [container-and-iac, database]
+  - id: pod-without-resource-limits
+    name: A pod has no CPU or memory limits, so one workload or a miner can starve the node
+    components: [kubernetes]
+    severity: medium
+    stride: [denial-of-service]
+    cwe: [CWE-770]
+    attack: [T1496, T1499]
+    countermeasures: [set-pod-resource-limits]
+
+  - id: flat-cluster-network
+    name: Any pod can reach any other pod because no NetworkPolicy limits traffic
+    components: [kubernetes]
+    severity: medium
+    stride: [information-disclosure, elevation-of-privilege]
+    cwe: [CWE-284]
+    countermeasures: [default-deny-network-policy]
+
+  - id: service-account-token-exposed
+    name: Every pod gets a Kubernetes API token mounted, so a compromised pod can call the cluster API
+    components: [kubernetes]
+    severity: medium
+    stride: [elevation-of-privilege]
+    cwe: [CWE-522]
+    attack: [T1528]
+    countermeasures: [disable-sa-token-automount]
+
+  # ---- CI/CD pipeline -------------------------------------------------------
+  - id: unpinned-ci-actions
+    name: Workflows use third-party actions by mutable tag, so a hijacked action runs with your secrets
+    components: [ci-pipeline]
     severity: high
-    stride: [information-disclosure, tampering]
-    cwe: [CWE-668]
-    countermeasures: [private-network-for-data-stores]
+    stride: [tampering, elevation-of-privilege]
+    cwe: [CWE-829, CWE-494]
+    attack: [T1195.002]
+    countermeasures: [pin-actions-to-sha]
+
+  - id: overbroad-workflow-token
+    name: The workflow token can write to the repo, packages, or releases although the job only reads
+    components: [ci-pipeline]
+    severity: medium
+    stride: [elevation-of-privilege]
+    cwe: [CWE-269]
+    attack: [T1528]
+    countermeasures: [least-privilege-workflow-permissions]
+
+  - id: untrusted-pr-code-in-privileged-workflow
+    name: A pull_request_target or similar workflow runs code from a fork's pull request with secrets and a write token
+    components: [ci-pipeline]
+    severity: high
+    stride: [elevation-of-privilege, tampering]
+    cwe: [CWE-829, CWE-94]
+    attack: [T1195.002, T1059]
+    countermeasures: [no-pr-head-in-privileged-workflows]
 
   # ---- Logging and error handling --------------------------------------------
   - id: verbose-errors
@@ -635,6 +929,7 @@ threats:
     severity: medium
     stride: [information-disclosure]
     cwe: [CWE-532]
+    attack: [T1552]
     countermeasures: [log-without-secrets]
 
   - id: no-security-logging
@@ -662,6 +957,7 @@ threats:
     stride: [tampering, elevation-of-privilege]
     cwe: [CWE-74]
     mcp_top10: ["MCP05:2025"]
+    attack: [T1059]
     countermeasures: [validate-model-output]
 
   - id: sensitive-data-sent-to-model
@@ -679,6 +975,7 @@ threats:
     severity: medium
     stride: [denial-of-service]
     cwe: [CWE-770]
+    attack: [T1496.004]
     countermeasures: [token-budgets, rate-limiting]
 
   # ---- AI agent with tools ---------------------------------------------------
@@ -689,6 +986,7 @@ threats:
     stride: [elevation-of-privilege]
     cwe: [CWE-250]
     mcp_top10: ["MCP02:2025"]
+    attack: [T1059]
     countermeasures: [least-privilege-agent-tools, human-approval-for-risky-actions]
 
   - id: indirect-prompt-injection
@@ -707,6 +1005,7 @@ threats:
     stride: [information-disclosure]
     cwe: [CWE-201]
     mcp_top10: ["MCP01:2025", "MCP10:2025"]
+    attack: [T1567]
     countermeasures: [restrict-agent-outbound, keep-secrets-out-of-agent-reach]
 
   - id: untrusted-mcp-server
@@ -716,6 +1015,7 @@ threats:
     stride: [elevation-of-privilege]
     cwe: [CWE-829]
     mcp_top10: ["MCP03:2025", "MCP04:2025"]
+    attack: [T1195.002]
     countermeasures: [pin-and-review-mcp-servers]
 
   # ---- Coding agent configuration --------------------------------------------
@@ -726,6 +1026,7 @@ threats:
     stride: [elevation-of-privilege, tampering]
     cwe: [CWE-829]
     mcp_top10: ["MCP03:2025", "MCP04:2025"]
+    attack: [T1195.002]
     countermeasures: [review-agent-extensions]
 
   - id: broad-agent-permission-rules
@@ -735,6 +1036,7 @@ threats:
     stride: [elevation-of-privilege]
     cwe: [CWE-250]
     mcp_top10: ["MCP02:2025"]
+    attack: [T1059]
     countermeasures: [narrow-agent-permission-rules, human-approval-for-risky-actions]
 
   - id: agent-reads-secrets
@@ -744,4 +1046,5 @@ threats:
     stride: [information-disclosure]
     cwe: [CWE-200]
     mcp_top10: ["MCP01:2025"]
+    attack: [T1552.001]
     countermeasures: [keep-secrets-out-of-agent-reach]

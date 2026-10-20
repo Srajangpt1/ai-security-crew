@@ -4,6 +4,8 @@
 #   name        short label shown in the menu
 #   applies_when  one line the agent reads to decide if it applies
 #   implies     (optional) components that always come with this one
+#   deprecated_alias_for  (optional) a retired id; picking it picks these
+#               components instead, and it is hidden from the menu
 components:
   - id: web-endpoint
     name: Web or API endpoint
@@ -89,9 +91,56 @@ components:
     name: Packages and dependencies
     applies_when: New libraries are added or updated (pip, npm, and so on).
 
+  - id: cloud-network
+    name: Cloud network (Terraform)
+    applies_when: Terraform/OpenTofu VPCs, subnets, security groups, NSGs, firewall rules, or load balancers.
+
+  - id: cloud-compute
+    name: Cloud servers (Terraform)
+    applies_when: Terraform/OpenTofu VMs, EC2 instances, launch templates, user data, or instance metadata.
+
+  - id: cloud-iam
+    name: Cloud IAM (Terraform)
+    applies_when: Terraform/OpenTofu IAM roles, policies, instance profiles, service accounts, or role bindings.
+
+  - id: cloud-storage
+    name: Cloud buckets (Terraform)
+    applies_when: Terraform/OpenTofu S3, GCS, or Azure Storage buckets and their policies.
+
+  - id: cloud-data-store
+    name: Cloud databases and queues (Terraform)
+    applies_when: Terraform/OpenTofu RDS, Cloud SQL, Azure SQL, DynamoDB, SQS, or SNS resources.
+
+  - id: cloud-encryption-and-logging
+    name: Cloud keys, audit logs, and state (Terraform)
+    applies_when: Terraform/OpenTofu KMS keys, CloudTrail or audit logs, flow logs, log groups, or the state backend.
+
+  - id: container-image
+    name: Container image
+    applies_when: A Dockerfile or container image build is written or changed.
+
+  - id: kubernetes
+    name: Kubernetes workloads
+    applies_when: Kubernetes manifests, Helm charts, or pod security settings are written or changed.
+
+  - id: ci-pipeline
+    name: CI/CD pipeline
+    applies_when: GitHub Actions or GitLab CI workflows, or the cloud access they use, are written or changed.
+
+  # Deprecated: kept so existing callers and saved threat models still resolve.
   - id: container-and-iac
     name: Containers and infrastructure code
     applies_when: Dockerfiles, Kubernetes, Terraform, or cloud permissions are written or changed.
+    deprecated_alias_for:
+      - cloud-network
+      - cloud-compute
+      - cloud-iam
+      - cloud-storage
+      - cloud-data-store
+      - cloud-encryption-and-logging
+      - container-image
+      - kubernetes
+      - ci-pipeline
 
   - id: logging-and-errors
     name: Logging and error handling

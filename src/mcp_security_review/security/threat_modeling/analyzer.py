@@ -8,10 +8,11 @@ structure, context enrichment, and reference integration.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from mcp_security_review.library import Library, describe, load_library
+from mcp_security_review.providers.attack import AttackIndex
 
 from .template import (
     ThreatEntry,
@@ -43,6 +44,7 @@ class ThreatModelAnalyzer:
         previous_models: list[dict[str, Any]] | None = None,
         components: list[str] | None = None,
         data_handled: list[str] | None = None,
+        attack: AttackIndex | None = None,
     ) -> dict[str, Any]:
         """Build the full context for the AI agent to generate a threat model.
 
@@ -63,6 +65,8 @@ class ThreatModelAnalyzer:
                 should have at minimum {title, source, content} or {title, url}.
             components: Library component ids the feature involves.
             data_handled: Kinds of sensitive data involved (raises the risk level).
+            attack: A loaded ATT&CK index used to name the techniques of the
+                known threats, or None to list technique ids only.
 
         Returns:
             Dict containing everything the AI agent needs to produce a
@@ -80,7 +84,7 @@ class ThreatModelAnalyzer:
                 "description": description,
             },
             "artifacts": self._sanitize_artifacts(artifacts),
-            "known_threats": self._known_threats(components, data_handled),
+            "known_threats": self._known_threats(components, data_handled, attack),
             "instructions": (
                 "Analyze the provided artifacts using known_threats as a starting "
                 "checklist: keep the ones that apply, drop the ones that do not, "
@@ -159,7 +163,7 @@ class ThreatModelAnalyzer:
             author=response_data.get("author", "security-review-mcp"),
             created_at=response_data.get(
                 "created_at",
-                datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             ),
             data_touched=response_data.get("data_touched", []),
             technologies=response_data.get("technologies", []),
@@ -172,6 +176,7 @@ class ThreatModelAnalyzer:
         self,
         components: list[str] | None,
         data_handled: list[str] | None,
+        attack: AttackIndex | None = None,
     ) -> dict[str, Any]:
         """Return library threats for the components, or the menu to pick from."""
         if not components:
@@ -186,7 +191,7 @@ class ThreatModelAnalyzer:
                 "components": self.library.menu(),
             }
         resolution = self.library.resolve(components, data_handled)
-        return {"status": "from_library", **describe(resolution)}
+        return {"status": "from_library", **describe(resolution, attack=attack)}
 
     def _sanitize_artifacts(
         self,

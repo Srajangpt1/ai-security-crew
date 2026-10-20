@@ -9,9 +9,15 @@ is never passed in, scanned, or returned.
 from dataclasses import dataclass, field
 
 from mcp_security_review.library import Library, load_library
+from mcp_security_review.library.models import Countermeasure, Threat
+from mcp_security_review.providers.attack import AttackIndex
 
 MAX_FOCUS_AREAS = 12
 MAX_COMPONENT_CHECKS = 15
+# Infrastructure checklists list every countermeasure up to this many: each is a
+# setting the agent can check, and cutting them would drop whole resource types.
+MAX_IAC_CHECKS = 40
+IAC_COMPONENTS = ("container-image", "kubernetes", "ci-pipeline")
 
 
 @dataclass
@@ -37,6 +43,7 @@ class CodeReviewContextBuilder:
         file_path: str | None = None,
         components: list[str] | None = None,
         data_handled: list[str] | None = None,
+        attack: AttackIndex | None = None,
     ) -> SecurityReviewContext:
         """Build context for AI security review.
 
@@ -45,9 +52,16 @@ class CodeReviewContextBuilder:
             components: Library component ids the code implements, as chosen in
                 the pre-coding review. Targets the checklist at their threats.
             data_handled: Kinds of sensitive data involved (raises the risk level).
+            attack: A loaded ATT&CK index. With it, a focus area whose threat
+                maps to a known technique names it, e.g.
+                `"... (ATT&CK T1190 Exploit Public-Facing Application)"`.
 
         Returns:
             SecurityReviewContext with all information needed for AI review.
+            Countermeasures for threats on picked infrastructure components
+            (see `is_iac_component`) carry their scanner check ids, compliance
+            ids, and false positive note. When only infrastructure components
+            are picked, the app-code baseline is left out; mixed picks keep it.
 
         Raises:
             UnknownComponentError: If a component id is not in the library.
@@ -58,18 +72,44 @@ class CodeReviewContextBuilder:
         picked: list[str] = []
         covered: set[str] = set()
 
+        iac_only = False
         if components:
             resolution = self._library.resolve(components, data_handled)
             picked = resolution.picked
+            iac_picked = {c for c in picked if is_iac_component(c)}
+            iac_only = bool(iac_picked) and len(iac_picked) == len(picked)
             risk_level = resolution.risk_level.value
-            focus_areas.extend(t.name for t in resolution.threats)
-            for measure in resolution.countermeasures[:MAX_COMPONENT_CHECKS]:
-                checklist.append(f"{measure.name}: {measure.how_to}")
+            focus_areas.extend(_focus_area(t, attack) for t in resolution.threats)
+            # Countermeasures for a threat on a picked infrastructure component
+            # get the infrastructure format and limit; the rest stay app items.
+            iac_threats = {
+                t.id
+                for t in resolution.threats
+                if iac_picked.intersection(t.components)
+            }
+            iac_measures = [
+                m
+                for m in resolution.countermeasures
+                if iac_threats.intersection(resolution.mitigates[m.id])
+            ]
+            iac_ids = {m.id for m in iac_measures}
+            app_measures = [
+                m for m in resolution.countermeasures if m.id not in iac_ids
+            ]
+            for measure in iac_measures[:MAX_IAC_CHECKS]:
+                checklist.append(_iac_item(measure))
+                covered.add(measure.id)
+            for measure in app_measures[:MAX_COMPONENT_CHECKS]:
+                checklist.append(_item(measure))
                 covered.add(measure.id)
 
+        # Infrastructure-only picks keep only the provider-neutral baseline items
+        # (secrets and logging); the rest of the baseline is about app code, so
+        # a pick that also names app components keeps all of it.
         for measure in self._library.baseline_countermeasures():
-            if measure.id not in covered:
-                checklist.append(f"{measure.name}: {measure.how_to}")
+            if measure.id in covered or (iac_only and "any" not in measure.providers):
+                continue
+            checklist.append(_item(measure))
 
         focus_areas = _unique(focus_areas)[:MAX_FOCUS_AREAS]
         checklist = _unique(checklist)
@@ -161,6 +201,60 @@ class CodeReviewContextBuilder:
         prompt_parts.append("4. **Recommendations:** Prioritized list of actions")
 
         return "\n".join(prompt_parts)
+
+
+def is_iac_component(component_id: str) -> bool:
+    """Whether a component is infrastructure code (cloud, image, cluster, CI)."""
+    return component_id.startswith("cloud-") or component_id in IAC_COMPONENTS
+
+
+def _item(measure: Countermeasure) -> str:
+    """Plain checklist line."""
+    return f"{measure.name}: {measure.how_to}"
+
+
+def _iac_item(measure: Countermeasure) -> str:
+    """Checklist line with scanner and compliance ids and the false positive note.
+
+    For example `"<name>: <how_to> [Trivy AVD-AWS-0028; Checkov CKV_AWS_79;
+    Prowler ec2_instance_imdsv2_enabled; CIS AWS 6.7] (false positive: ...)"`.
+    """
+    refs: list[tuple[str, list[str]]] = []
+    if measure.checks is not None:
+        refs += [
+            ("Trivy", measure.checks.trivy),
+            ("Checkov", measure.checks.checkov),
+            ("Prowler", measure.checks.prowler),
+            ("KICS", measure.checks.kics),
+        ]
+    if measure.compliance is not None:
+        refs += [
+            ("CIS AWS", measure.compliance.cis_aws),
+            ("CIS Azure", measure.compliance.cis_azure),
+            ("CIS GCP", measure.compliance.cis_gcp),
+            ("NIST 800-53", measure.compliance.nist_800_53),
+        ]
+    text = _item(measure)
+    listed = [f"{label} {', '.join(ids)}" for label, ids in refs if ids]
+    if listed:
+        text += f" [{'; '.join(listed)}]"
+    if measure.false_positives:
+        text += f" (false positive: {measure.false_positives})"
+    return text
+
+
+def _focus_area(threat: Threat, attack: AttackIndex | None) -> str:
+    """Name a threat with its first current ATT&CK technique the index knows.
+
+    Techniques ATT&CK has revoked or deprecated are skipped.
+    """
+    if attack is not None:
+        for tid in threat.attack:
+            tech = attack.technique(tid)
+            if tech is None or tech.get("revoked") or tech.get("deprecated"):
+                continue
+            return f"{threat.name} (ATT&CK {tech['id']} {tech['name']})"
+    return threat.name
 
 
 def _unique(items: list[str]) -> list[str]:

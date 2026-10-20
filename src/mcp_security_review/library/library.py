@@ -3,6 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from mcp_security_review.providers.attack import AttackIndex, attack_summary
+
 from .models import SEVERITY_RANK, Component, Countermeasure, Severity, Threat
 
 SENSITIVE_DATA_TYPES = (
@@ -59,20 +61,38 @@ class Library:
         return [m for m in self.countermeasures.values() if m.baseline]
 
     def menu(self) -> list[dict[str, str]]:
-        """Return the component menu shown to the agent."""
+        """Return the component menu shown to the agent.
+
+        Deprecated aliases are left out; they still resolve when passed.
+        """
         return [
             {"id": c.id, "name": c.name, "applies_when": c.applies_when}
             for c in self.components.values()
+            if not c.deprecated_alias_for
         ]
 
-    def expand(self, component_ids: list[str]) -> list[str]:
-        """Add implied components, keep order, and reject unknown ids."""
+    def unalias(self, component_ids: list[str]) -> list[str]:
+        """Replace deprecated aliases by the components they stand for.
+
+        Raises:
+            UnknownComponentError: If a component id is not in the library.
+        """
         unknown = [c for c in component_ids if c not in self.components]
         if unknown:
             raise UnknownComponentError(unknown, list(self.components))
+        replaced: list[str] = []
+        for component_id in component_ids:
+            targets = self.components[component_id].deprecated_alias_for
+            replaced.extend(targets or [component_id])
+        return list(dict.fromkeys(replaced))
 
+    def expand(self, component_ids: list[str]) -> list[str]:
+        """Add implied components, keep order, and reject unknown ids.
+
+        A deprecated alias is replaced by its components, as if they were picked.
+        """
         expanded: list[str] = []
-        pending = list(component_ids)
+        pending = self.unalias(component_ids)
         while pending:
             current = pending.pop(0)
             if current in expanded:
@@ -87,7 +107,8 @@ class Library:
         """Find the threats and countermeasures for the given components.
 
         Args:
-            component_ids: Components the feature involves.
+            component_ids: Components the feature involves. A deprecated alias
+                counts as picking each component it stands for.
             sensitive_data: Kinds of sensitive data handled, which raise the
                 risk level by one step.
 
@@ -99,8 +120,9 @@ class Library:
         Raises:
             UnknownComponentError: If a component id is not in the library.
         """
-        expanded = self.expand(component_ids)
-        picked = set(component_ids)
+        picked_ids = self.unalias(component_ids)
+        expanded = self.expand(picked_ids)
+        picked = set(picked_ids)
         selected = set(expanded)
 
         threats = [
@@ -130,7 +152,7 @@ class Library:
         )
         return Resolution(
             components=expanded,
-            picked=list(dict.fromkeys(component_ids)),
+            picked=picked_ids,
             threats=threats,
             also_consider=also_consider,
             countermeasures=[self.countermeasures[i] for i in ordered_ids],
@@ -165,8 +187,28 @@ def summarize(resolution: Resolution) -> dict[str, Any]:
     }
 
 
-def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, Any]:
-    """Return the compact, JSON-ready view of a resolution used by the tools."""
+def describe(
+    resolution: Resolution,
+    max_also_consider: int = 8,
+    attack: AttackIndex | None = None,
+) -> dict[str, Any]:
+    """Return the compact, JSON-ready view of a resolution used by the tools.
+
+    Args:
+        resolution: The resolved components, threats, and countermeasures.
+        max_also_consider: Most lesser-priority threats to list.
+        attack: A loaded ATT&CK index, or None while it downloads. Threats
+            with ATT&CK ids get an `attack` list; with an index each item
+            carries the technique name and tactics, without one only the id.
+
+    Returns:
+        The view. `also_consider` lists at most `max_also_consider` threats;
+        `also_consider_total` is the full count and `also_consider_truncated`
+        says whether the list was cut. `sources["attack"]` says whether
+        technique names were available (`"ok (ATT&CK <version>)"`) or are still
+        pending.
+    """
+    _, attack_status = attack_summary([], attack)
     return {
         "risk_level": resolution.risk_level.value,
         "components": resolution.picked,
@@ -174,7 +216,7 @@ def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, An
             c for c in resolution.components if c not in resolution.picked
         ],
         "sensitive_data": resolution.sensitive_data,
-        "threats": [_threat_view(t) for t in resolution.threats],
+        "threats": [_threat_view(t, attack) for t in resolution.threats],
         "countermeasures": [
             {
                 "id": m.id,
@@ -190,11 +232,17 @@ def describe(resolution: Resolution, max_also_consider: int = 8) -> dict[str, An
             {"id": t.id, "name": t.name, "severity": t.severity.value}
             for t in resolution.also_consider[:max_also_consider]
         ],
+        "also_consider_total": len(resolution.also_consider),
+        "also_consider_truncated": len(resolution.also_consider) > max_also_consider,
+        "sources": {"attack": attack_status},
     }
 
 
-def _threat_view(threat: Threat) -> dict[str, Any]:
-    """Compact view of one threat; the MCP Top 10 ids appear only when present."""
+def _threat_view(threat: Threat, attack: AttackIndex | None) -> dict[str, Any]:
+    """Compact view of one threat.
+
+    The MCP Top 10 and ATT&CK fields appear only when the threat has them.
+    """
     view: dict[str, Any] = {
         "id": threat.id,
         "name": threat.name,
@@ -203,4 +251,6 @@ def _threat_view(threat: Threat) -> dict[str, Any]:
     }
     if threat.mcp_top10:
         view["mcp_top10"] = threat.mcp_top10
+    if threat.attack:
+        view["attack"], _ = attack_summary(threat.attack, attack)
     return view

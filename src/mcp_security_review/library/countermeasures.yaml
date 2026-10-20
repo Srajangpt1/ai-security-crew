@@ -6,6 +6,12 @@
 #   asvs      OWASP ASVS 5.0.0 requirement ids (format v5.0.0-<chapter>.<section>.<item>)
 #             that back this control; empty when ASVS has no matching requirement
 #   baseline  (optional) true = included in every code review checklist
+#   providers (optional) aws | azure | gcp | any: clouds the advice applies to
+#   checks    (optional) scanner check ids that test for it: trivy, checkov,
+#             prowler, kics (ids only, confirmed in each scanner's catalogue)
+#   compliance (optional) cis_aws (v7.0), cis_azure (v6.0), cis_gcp (v5.0),
+#             nist_800_53 (rev 5) ids
+#   false_positives (optional) when scanners report this wrongly (<= 400 chars)
 countermeasures:
   # ---- Web and API -----------------------------------------------------------
   - id: csrf-protection
@@ -222,6 +228,7 @@ countermeasures:
     how_to: Block public access on the bucket and issue signed URLs that expire in minutes.
     effort: low
     asvs: []
+    providers: [any]
 
   - id: short-lived-scoped-credentials
     name: Give clients short-lived, narrowly scoped credentials
@@ -303,6 +310,7 @@ countermeasures:
     effort: medium
     asvs: [v5.0.0-13.3.1, v5.0.0-13.3.2]
     baseline: true
+    providers: [any]
 
   - id: approved-crypto
     name: Use approved algorithms and modes
@@ -427,23 +435,710 @@ countermeasures:
     effort: low
     asvs: [v5.0.0-15.2.1]
 
-  - id: non-root-minimal-images
-    name: Run containers as non-root on minimal images
-    how_to: Set a non-root USER, use a slim or distroless base image, and drop extra capabilities.
+  # ---- Cloud network ---------------------------------------------------------
+  - id: restrict-admin-ingress
+    name: Never open admin ports to the whole internet
+    how_to: >-
+      No security group, NACL, NSG, or firewall rule may allow 0.0.0.0/0 or ::/0
+      to SSH (22), RDP (3389), database ports, or all ports. Let the internet reach
+      only the load balancer on 443 (and 80 for redirects), reference security
+      groups instead of CIDRs between tiers, use SSM Session Manager, a bastion, or
+      IAP for admin access, and remove every rule from the VPC's default security
+      group.
     effort: low
-    asvs: [v5.0.0-15.2.3]
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0107, AVD-AWS-0105, AVD-AWS-0173, AVD-AZU-0050, AVD-AZU-0048, AVD-GCP-0071, AVD-GCP-0070]
+      checkov: [CKV_AWS_24, CKV_AWS_25, CKV_AWS_277, CKV2_AWS_12, CKV_AZURE_10, CKV_AZURE_9, CKV_GCP_2, CKV_GCP_3]
+      prowler:
+        - ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_22
+        - ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_3389
+        - ec2_securitygroup_allow_ingress_from_internet_to_all_ports
+        - ec2_securitygroup_default_restrict_traffic
+        - network_ssh_internet_access_restricted
+        - compute_firewall_ssh_access_from_the_internet_allowed
+      kics: [65905cec-d691-4320-b320-2000436cb696, 4728cd65-a20c-49da-8b31-9c08b423e4db]
+    compliance:
+      cis_aws: ["6.2", "6.3", "6.4", "6.5"]
+      cis_azure: ["7.1", "7.2"]
+      cis_gcp: ["3.6", "3.7"]
+      nist_800_53: [SC-7, AC-17]
 
+  - id: restrict-egress
+    name: Limit outbound traffic to what the workload calls
+    how_to: >-
+      Do not leave an allow-all egress rule (0.0.0.0/0 on every port). Write egress
+      rules for the ports and destinations the app needs: VPC endpoints or prefix
+      lists for AWS services, the database security group, and 443 to known APIs
+      through a NAT gateway or egress proxy. The aws_security_group resource drops
+      AWS's default allow-all egress, so declare egress blocks explicitly. On GCP add
+      a low-priority deny-all egress firewall rule; on Azure add an outbound deny
+      rule after the allowed ones.
+    effort: medium
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0104, AVD-AZU-0051, AVD-GCP-0035]
+      checkov: [CKV_AWS_382]
+      prowler: [ec2_securitygroup_allow_wide_open_public_ipv4]
+    compliance:
+      nist_800_53: [SC-7(5)]
+
+  - id: no-public-ip-on-instances
+    name: Keep servers on private subnets without public IPs
+    how_to: >-
+      Set associate_public_ip_address = false on instances and launch templates and
+      map_public_ip_on_launch = false on subnets. Put servers behind a load
+      balancer, send their outbound traffic through a NAT gateway, and reach them
+      with SSM Session Manager, a bastion, or IAP. On GCP leave access_config out of
+      network_interface; on Azure do not attach a public IP to the network
+      interface.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0009, AVD-AWS-0164, AVD-GCP-0031, AVD-AZU-0076]
+      checkov: [CKV_AWS_88, CKV_AWS_130, CKV_GCP_40, CKV_AZURE_119]
+      prowler: [ec2_instance_public_ip, ec2_launch_template_no_public_ip, vpc_subnet_no_public_ip_by_default, compute_instance_public_ip]
+      kics: [5a2486aa-facf-477d-a5c1-b010789459ce, 52f04a44-6bfa-4c41-b1d3-4ae99a2de05c]
+    compliance:
+      cis_gcp: ["4.9"]
+      nist_800_53: [SC-7]
+
+  - id: lb-tls-policy
+    name: Serve only HTTPS with a TLS 1.2+ policy on load balancers
+    how_to: >-
+      Use HTTPS or TLS listeners with ssl_policy = "ELBSecurityPolicy-TLS13-1-2-2021-06"
+      (or the stricter ELBSecurityPolicy-TLS13-1-2-Res-2021-06, or a FIPS variant
+      when required), and make any port 80 listener only redirect to HTTPS. Never
+      forward plain HTTP that carries user data. On GCP attach an SSL policy with
+      min_tls_version = "TLS_1_2" and the MODERN or RESTRICTED profile; on Azure
+      Application Gateway use a predefined policy such as AppGwSslPolicy20220101.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0047, AVD-AWS-0054, AVD-GCP-0039]
+      checkov: [CKV_AWS_103, CKV_AWS_2, CKV2_AWS_20, CKV_GCP_4, CKV_AZURE_218]
+      prowler: [elbv2_insecure_ssl_ciphers, elbv2_ssl_listeners, elb_insecure_ssl_ciphers]
+    compliance:
+      cis_azure: ["7.12"]
+      cis_gcp: ["3.11"]
+      nist_800_53: [SC-8, SC-13]
+
+  - id: lb-access-logs
+    name: Turn on load balancer access logs
+    how_to: >-
+      Add an access_logs block with enabled = true to every aws_lb, writing to an S3
+      bucket in the same region whose policy lets only the regional log delivery
+      service write, with block public access and a lifecycle rule for retention.
+      ALB log delivery needs SSE-S3 on that bucket, not a KMS key. On GCP set
+      log_config with enable = true on backend services; on Azure add an
+      azurerm_monitor_diagnostic_setting to each Application Gateway or Front Door
+      that sends its access log category (ApplicationGatewayAccessLog) to Log
+      Analytics or a storage account.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      checkov: [CKV_AWS_91, CKV_AWS_92]
+      prowler: [elbv2_logging_enabled, elb_logging_enabled, compute_loadbalancer_logging_enabled]
+      kics: [3e34db4f-0ad9-4290-bfd0-4a9ee884acaf, 20018359-6fd7-4d05-ab26-d4dffccbdf79]
+    compliance:
+      cis_aws: ["4.10"]
+      cis_azure: ["6.1.4"]
+      cis_gcp: ["2.17"]
+      nist_800_53: [AU-2, AU-12]
+
+  - id: vpc-flow-logs
+    name: Record VPC flow logs
+    how_to: >-
+      Create an aws_flow_log for every VPC with traffic_type = "ALL", delivered to
+      CloudWatch Logs or S3 with a retention period, so you can see which hosts
+      talked to what after an incident. On GCP add log_config to every subnetwork;
+      on Azure enable virtual network or NSG flow logs in Network Watcher and keep
+      them at least 90 days.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0178, AVD-GCP-0029, AVD-GCP-0076, AVD-AZU-0073, AVD-AZU-0049]
+      checkov: [CKV2_AWS_11, CKV_GCP_26, CKV_AZURE_12]
+      prowler: [vpc_flow_logs_enabled, compute_subnet_flow_logs_enabled, network_flow_log_more_than_90_days]
+    compliance:
+      cis_aws: ["4.7"]
+      cis_azure: ["7.5"]
+      cis_gcp: ["3.10"]
+      nist_800_53: [AU-12, SI-4]
+
+  # ---- Cloud servers ---------------------------------------------------------
+  - id: require-imdsv2
+    name: Require IMDSv2 with a hop limit of 1
+    how_to: >-
+      In every aws_instance and aws_launch_template set metadata_options with
+      http_tokens = "required" and http_put_response_hop_limit = 1, or
+      http_endpoint = "disabled" when nothing on the host reads metadata. Session
+      tokens block SSRF requests that cannot send a PUT, and a hop limit of 1 keeps
+      containers and forwarded requests on the host from reaching the role
+      credentials; raise it to 2 only on container hosts whose pods must use the
+      node role. Add aws_ec2_instance_metadata_defaults so new instances in the
+      region default to IMDSv2.
+    effort: low
+    providers: [aws]
+    checks:
+      trivy: [AVD-AWS-0028, AVD-AWS-0130]
+      checkov: [CKV_AWS_79, CKV_AWS_341]
+      prowler: [ec2_instance_imdsv2_enabled, ec2_launch_template_imdsv2_required, ec2_instance_account_imdsv2_enabled]
+      kics: [c306ac53-ee5b-41d3-86a9-0fd2722b4e67]
+    compliance:
+      cis_aws: ["6.7"]
+      nist_800_53: [CM-6, AC-6]
+    false_positives: Scanners may flag aws_instance when metadata_options are set on the launch template it uses.
+
+  - id: no-secrets-in-user-data-or-tf-config
+    name: Keep secrets out of user data and Terraform config
+    how_to: >-
+      Never put passwords, keys, or tokens in user_data, custom_data, startup
+      scripts, variable defaults, committed tfvars files, or provider blocks: user
+      data is readable by anything that can query the metadata service. Have the
+      instance fetch secrets at boot from Secrets Manager or SSM Parameter Store
+      with its role, let RDS manage the master password
+      (manage_master_user_password = true) or use a write-only argument, and mark
+      any remaining secret variables and outputs sensitive = true.
+    effort: medium
+    providers: [aws, azure]
+    checks:
+      trivy: [AVD-AWS-0029, AVD-AWS-0129, AVD-AZU-0037]
+      checkov: [CKV_AWS_46, CKV_AWS_41, CKV_AZURE_45]
+      prowler: [ec2_instance_secrets_user_data, ec2_launch_template_no_secrets]
+      kics: [443488f5-c734-460b-a36d-5b3f330174dc]
+    compliance:
+      nist_800_53: [IA-5(7)]
+
+  - id: encrypt-block-storage
+    name: Encrypt server disks with a customer managed key
+    how_to: >-
+      Turn on aws_ebs_encryption_by_default and set aws_ebs_default_kms_key for each
+      account and region, and set encrypted = true with a kms_key_id on
+      root_block_device, ebs_block_device, aws_ebs_volume, and launch template
+      block_device_mappings. Snapshots of encrypted volumes can then be used only by
+      accounts the key policy allows. On Azure use a disk encryption set; on GCP set
+      disk_encryption_key with a Cloud KMS key.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0131, AVD-AWS-0026, AVD-AWS-0027, AVD-AWS-0008, AVD-AZU-0038, AVD-GCP-0034]
+      checkov: [CKV_AWS_3, CKV_AWS_8, CKV_AWS_189, CKV_AZURE_2]
+      prowler: [ec2_ebs_default_encryption, ec2_ebs_volume_encryption, ec2_ebs_snapshots_encrypted]
+    compliance:
+      cis_aws: ["6.1.1"]
+      nist_800_53: [SC-28]
+    false_positives: >-
+      Scanners may flag aws_instance when its disks are encrypted through the launch
+      template it uses or through account-level EBS encryption by default.
+
+  # ---- Cloud IAM -------------------------------------------------------------
   - id: least-privilege-iam
     name: Grant only the cloud permissions the app uses
-    how_to: Write narrow roles per service, avoid wildcards on actions and resources, and review them when features change.
+    how_to: >-
+      List the exact actions and resource ARNs each role needs. Never pair Action
+      "*" or Resource "*" with write actions, and avoid service wildcards such as
+      ssm:*, s3:*, iam:*, kms:*, or ec2:* (ssm:* includes SendCommand and
+      StartSession, which run commands on every managed instance). Narrow access
+      with conditions such as aws:SourceVpc, aws:ResourceTag, or
+      iam:PassedToService, limit iam:PassRole to named roles, and do not attach
+      AdministratorAccess or *FullAccess managed policies to workloads. On GCP avoid
+      basic roles (owner, editor); on Azure avoid Owner and custom roles with "*"
+      actions.
     effort: medium
     asvs: []
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0342, AVD-AWS-0345, AVD-GCP-0007, AVD-AZU-0030]
+      checkov: [CKV_AWS_355, CKV_AWS_63, CKV_AWS_62, CKV_AWS_286, CKV_AWS_290, CKV_GCP_42, CKV_GCP_117, CKV_AZURE_39]
+      prowler:
+        - iam_customer_attached_policy_no_administrative_privileges
+        - iam_inline_policy_no_administrative_privileges
+        - iam_policy_allows_privilege_escalation
+        - iam_no_custom_policy_permissive_role_assumption
+        - iam_sa_no_administrative_privileges
+        - iam_subscription_roles_owner_custom_not_created
+      kics: [2f37c4a3-58b9-4afe-8a87-d7f1d2286f84]
+    compliance:
+      cis_aws: ["2.14"]
+      cis_azure: ["5.4"]
+      cis_gcp: ["1.6"]
+      nist_800_53: [AC-6]
+    false_positives: >-
+      Scanners may flag Resource "*" on List or Describe actions that do not support
+      resource-level permissions; that is fine when the action list itself is
+      narrow.
 
+  - id: instance-role-least-privilege
+    name: Give each server its own narrowly scoped role
+    how_to: >-
+      Attach an instance profile (or an IRSA or EKS Pod Identity role) per
+      workload, never long-lived access keys on the host, and grant only what that
+      workload calls. For Session Manager attach AmazonSSMManagedInstanceCore, not
+      AmazonSSMFullAccess or ssm:*, and never AdministratorAccess. Do not share one
+      role between internet-facing and private servers. On GCP use a dedicated
+      service account with specific roles, not the default compute service account
+      with the cloud-platform scope.
+    effort: medium
+    providers: [aws, gcp]
+    checks:
+      trivy: [AVD-GCP-0044]
+      checkov: [CKV2_AWS_41, CKV_GCP_30, CKV_GCP_31]
+      prowler:
+        - ec2_instance_profile_attached
+        - iam_role_administratoraccess_policy
+        - ec2_instance_internet_facing_with_instance_profile
+        - compute_instance_default_service_account_in_use
+        - compute_instance_default_service_account_in_use_with_full_api_access
+      kics: [c53c7a89-f9d7-4c7b-8b66-8a555be99593]
+    compliance:
+      cis_aws: ["2.16"]
+      cis_gcp: ["4.1", "4.2"]
+      nist_800_53: [AC-6]
+
+  - id: ci-oidc-federation
+    name: Use OIDC federation instead of long-lived cloud keys in CI
+    how_to: >-
+      Give the job id-token: write and assume a cloud role through OIDC
+      (aws-actions/configure-aws-credentials with role-to-assume,
+      google-github-actions/auth with workload identity federation, or azure/login
+      with a federated credential) instead of storing access keys as secrets. In
+      the trust policy require the audience sts.amazonaws.com and pin the
+      token.actions.githubusercontent.com:sub claim to the exact repo and branch or
+      environment (repo:org/app:ref:refs/heads/main), never a wildcard over all
+      repos. Delete the IAM user keys this replaces.
+    effort: medium
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0146, AVD-GCP-0068]
+      checkov: [CKV_AWS_358, CKV_AWS_393, CKV_GCP_125, CKV_AZURE_249]
+      prowler: [iam_rotate_access_key_90_days, iam_user_accesskey_unused]
+    compliance:
+      cis_aws: ["2.11", "2.12"]
+      nist_800_53: [IA-5, AC-2]
+
+  # ---- Cloud buckets ---------------------------------------------------------
+  - id: block-public-storage-access
+    name: Block public access on every bucket
+    how_to: >-
+      Add aws_s3_account_public_access_block and an aws_s3_bucket_public_access_block
+      per bucket with block_public_acls, block_public_policy, ignore_public_acls, and
+      restrict_public_buckets all true, set object_ownership = "BucketOwnerEnforced"
+      so ACLs are off, and never use Principal "*" in a bucket policy without a
+      narrowing condition. Serve public files through CloudFront with origin access
+      control instead. On GCP set public_access_prevention = "enforced" and uniform
+      bucket-level access; on Azure set allow_nested_items_to_be_public = false.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0086, AVD-AWS-0087, AVD-AWS-0091, AVD-AWS-0093, AVD-AWS-0094, AVD-GCP-0001, AVD-AZU-0007]
+      checkov: [CKV_AWS_53, CKV_AWS_54, CKV_AWS_55, CKV_AWS_56, CKV2_AWS_6, CKV_AWS_70, CKV_GCP_114, CKV_AZURE_190]
+      prowler:
+        - s3_bucket_level_public_access_block
+        - s3_account_level_public_access_blocks
+        - s3_bucket_public_access
+        - s3_bucket_policy_public_write_access
+        - cloudstorage_bucket_public_access
+        - storage_blob_public_access_level_is_disabled
+    compliance:
+      cis_aws: ["3.1.4"]
+      cis_azure: ["9.3.8"]
+      cis_gcp: ["5.1"]
+      nist_800_53: [AC-3, SC-7]
+
+  - id: encrypt-buckets-with-kms
+    name: Encrypt buckets with a KMS key and require TLS
+    how_to: >-
+      Configure aws_s3_bucket_server_side_encryption_configuration with
+      sse_algorithm = "aws:kms", a customer managed kms_master_key_id, and
+      bucket_key_enabled = true, and add a bucket policy statement that denies s3:*
+      when aws:SecureTransport is false. On GCP set a default_kms_key_name in the
+      bucket's encryption block; on Azure use customer-managed keys and keep
+      https_traffic_only_enabled = true with min_tls_version = "TLS1_2".
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0132, AVD-GCP-0066, AVD-AZU-0060, AVD-AZU-0008, AVD-AZU-0011]
+      checkov: [CKV_AWS_145, CKV2_AZURE_1, CKV_AZURE_3, CKV_AZURE_44]
+      prowler: [s3_bucket_kms_encryption, s3_bucket_secure_transport_policy, storage_secure_transfer_required_is_enabled, storage_ensure_minimum_tls_version_12]
+    compliance:
+      cis_aws: ["3.1.1"]
+      cis_azure: ["9.3.4", "9.3.6"]
+      nist_800_53: [SC-28, SC-8]
+
+  - id: bucket-versioning-and-access-logs
+    name: Keep object versions and access logs for important buckets
+    how_to: >-
+      Enable aws_s3_bucket_versioning with a lifecycle rule that expires old
+      versions, use Object Lock for audit and backup buckets, and send server access
+      logs (or CloudTrail S3 data events) to a separate log bucket. On GCP enable
+      versioning and a logging block on the bucket.
+    effort: low
+    providers: [aws, gcp]
+    checks:
+      trivy: [AVD-AWS-0090, AVD-AWS-0089, AVD-GCP-0078, AVD-GCP-0077]
+      checkov: [CKV_AWS_21, CKV_AWS_18, CKV_GCP_78, CKV_GCP_62]
+      prowler: [s3_bucket_object_versioning, s3_bucket_server_access_logging_enabled, cloudstorage_bucket_logging_enabled]
+      kics: [568a4d22-3517-44a6-a7ad-6a7eed88722c]
+    compliance:
+      nist_800_53: [CP-9, AU-2]
+
+  # ---- Cloud databases and queues ------------------------------------------
   - id: private-network-for-data-stores
     name: Keep data stores off the public internet
-    how_to: Place databases and caches in private subnets, bind them to internal interfaces, and allow only the app through security groups.
+    how_to: >-
+      Set publicly_accessible = false on RDS and other managed databases, place them
+      in a DB subnet group of private subnets, and allow the database port only from
+      the app's security group, never from a CIDR such as 0.0.0.0/0. Bind
+      self-managed databases and caches to private interfaces. On GCP give Cloud SQL
+      a private IP only (ipv4_enabled = false); on Azure set
+      public_network_access_enabled = false and use private endpoints.
     effort: low
     asvs: []
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0180, AVD-GCP-0017, AVD-AZU-0022, AVD-AZU-0029]
+      checkov: [CKV_AWS_17, CKV_GCP_60, CKV_AZURE_113, CKV_AZURE_11]
+      prowler: [rds_instance_no_public_access, cloudsql_instance_public_ip, cloudsql_instance_public_access, sqlserver_unrestricted_inbound_access]
+      kics: [35113e6f-2c6b-414d-beec-7a9482d3b2d1, 2f737336-b18a-4602-8ea0-b200312e1ac1]
+    compliance:
+      cis_aws: ["3.2.3"]
+      cis_gcp: ["6.5"]
+      nist_800_53: [SC-7]
+
+  - id: enforce-db-tls
+    name: Require TLS to the database and verify its certificate
+    how_to: >-
+      In the DB parameter group set rds.force_ssl = 1 (PostgreSQL, SQL Server) or
+      require_secure_transport = ON (MySQL, MariaDB), and have clients connect with
+      sslmode=verify-full (or ssl-mode=VERIFY_IDENTITY) and the RDS CA bundle so a
+      machine in the middle cannot present its own certificate. On GCP set ssl_mode
+      = "ENCRYPTED_ONLY" or "TRUSTED_CLIENT_CERTIFICATE_REQUIRED"; on Azure keep
+      require_secure_transport on with a minimum TLS version of 1.2.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-GCP-0015, AVD-AZU-0020, AVD-AZU-0026]
+      checkov: [CKV2_AWS_69, CKV_GCP_6, CKV_AZURE_28, CKV_AZURE_29]
+      prowler: [rds_instance_transport_encrypted, cloudsql_instance_ssl_connections, postgresql_flexible_server_enforce_ssl_enabled, mysql_flexible_server_ssl_connection_enabled]
+    compliance:
+      cis_gcp: ["6.4"]
+      nist_800_53: [SC-8]
+
+  - id: encrypt-databases-at-rest
+    name: Encrypt databases with a customer managed key
+    how_to: >-
+      Set storage_encrypted = true and kms_key_id to a customer managed key on
+      aws_db_instance and aws_rds_cluster when you create them (turning encryption on
+      later needs a snapshot copy and restore), and set
+      performance_insights_kms_key_id too. Snapshots can then be restored only by
+      accounts the key policy allows. On Azure SQL keep TDE on with a Key Vault key
+      as the protector (azurerm_mssql_server_transparent_data_encryption with
+      key_vault_key_id), and give PostgreSQL or MySQL flexible servers a
+      customer_managed_key block. On GCP set encryption_key_name on the Cloud SQL
+      instance and default_encryption_configuration on BigQuery datasets to a
+      Cloud KMS key.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0080, AVD-AWS-0079, AVD-AWS-0078]
+      checkov: [CKV_AWS_16, CKV_AWS_327, CKV2_AZURE_25, CKV2_AZURE_17, CKV2_AZURE_16, CKV_GCP_81]
+      prowler:
+        - rds_instance_storage_encrypted
+        - rds_cluster_storage_encrypted
+        - sqlserver_tde_encrypted_with_cmk
+        - sqlserver_tde_encryption_enabled
+        - cloudsql_instance_cmek_encryption_enabled
+        - bigquery_dataset_cmk_encryption
+      kics: [3199c26c-7871-4cb3-99c2-10a59244ce7f, 656880aa-1388-488f-a6d4-8f73c23149b2]
+    compliance:
+      cis_aws: ["3.2.1"]
+      cis_gcp: ["7.3"]
+      nist_800_53: [SC-28]
+
+  - id: encrypt-queues-topics-and-logs
+    name: Encrypt queues, topics, secrets, and log groups with KMS
+    how_to: >-
+      Set kms_master_key_id on aws_sqs_queue and aws_sns_topic, and kms_key_id on
+      aws_cloudwatch_log_group and aws_secretsmanager_secret, using customer managed
+      keys whose key policy lets that service use them (for log groups, the
+      logs.<region>.amazonaws.com principal). Give each log group a
+      retention_in_days so logs are neither lost early nor kept forever. On Azure
+      give Service Bus namespaces a customer_managed_key and encrypt the storage
+      account that holds exported activity logs with a Key Vault key; on GCP set
+      kms_key_name on Pub/Sub topics.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0096, AVD-AWS-0135, AVD-AWS-0095, AVD-AWS-0136, AVD-AWS-0017, AVD-AWS-0098]
+      checkov: [CKV_AWS_27, CKV_AWS_26, CKV_AWS_158, CKV_AWS_149, CKV_AWS_66, CKV_AZURE_201, CKV_GCP_83]
+      prowler:
+        - sqs_queues_server_side_encryption_enabled
+        - sns_topics_kms_encryption_at_rest_enabled
+        - cloudwatch_log_group_kms_encryption_enabled
+        - cloudwatch_log_group_retention_policy_specific_days_enabled
+        - monitor_storage_account_with_activity_logs_cmk_encrypted
+    compliance:
+      cis_azure: ["6.1.1.3"]
+      nist_800_53: [SC-28, SC-12]
+
+  - id: db-backups-and-deletion-protection
+    name: Keep backups, point-in-time recovery, and deletion protection on
+    how_to: >-
+      On aws_db_instance and aws_rds_cluster set backup_retention_period to 7 or
+      more, deletion_protection = true, and skip_final_snapshot = false with a
+      final_snapshot_identifier; turn on point_in_time_recovery for DynamoDB tables.
+      Add lifecycle prevent_destroy to production data stores, and copy backups to
+      another account or region with AWS Backup. On GCP enable backup_configuration
+      with point_in_time_recovery_enabled, and deletion_protection. On Azure set
+      backup_retention_days and geo_redundant_backup_enabled = true on PostgreSQL
+      and MySQL flexible servers, give Azure SQL databases short-term and long-term
+      retention policies, and add an azurerm_management_lock with lock_level =
+      "CanNotDelete" to production data stores.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0077, AVD-AWS-0177, AVD-AWS-0343, AVD-AWS-0024, AVD-GCP-0024]
+      checkov: [CKV_AWS_133, CKV_AWS_293, CKV_AWS_139, CKV_AWS_28, CKV_GCP_14, CKV2_GCP_20, CKV_AZURE_136]
+      prowler:
+        - rds_instance_backup_enabled
+        - rds_instance_deletion_protection
+        - rds_cluster_deletion_protection
+        - dynamodb_tables_pitr_enabled
+        - cloudsql_instance_automated_backups
+        - postgresql_flexible_server_geo_redundant_backup_enabled
+        - mysql_flexible_server_geo_redundant_backup_enabled
+      kics: [1dc73fb4-5b51-430c-8c5f-25dcf9090b02]
+    compliance:
+      cis_azure: ["6.2"]
+      cis_gcp: ["6.8"]
+      nist_800_53: [CP-9, CP-10]
+
+  # ---- Cloud keys, audit logs, and state ------------------------------------
+  - id: audit-trail-all-regions
+    name: Record API activity in every region with tamper-evident logs
+    how_to: >-
+      Create an organization or account aws_cloudtrail with is_multi_region_trail =
+      true, include_global_service_events = true, enable_log_file_validation = true
+      (log file validation proves files were not changed), a customer managed
+      kms_key_id, and delivery to CloudWatch Logs for alerting. Write it to a
+      dedicated private S3 bucket, ideally in a separate log account, with
+      versioning or Object Lock, so whoever compromises the workload account cannot
+      erase the evidence. On Azure export the Activity Log with a diagnostic
+      setting; on GCP enable Data Access audit logs for all services.
+    effort: medium
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0014, AVD-AWS-0016, AVD-AWS-0015, AVD-AWS-0161, AVD-AWS-0162, AVD-AZU-0032, AVD-GCP-0079]
+      checkov: [CKV_AWS_67, CKV_AWS_36, CKV_AWS_35, CKV2_AWS_10, CKV_AZURE_37, CKV2_GCP_5]
+      prowler:
+        - cloudtrail_multi_region_enabled
+        - cloudtrail_log_file_validation_enabled
+        - cloudtrail_kms_encryption_enabled
+        - cloudtrail_logs_s3_bucket_is_not_publicly_accessible
+        - monitor_diagnostic_settings_exists
+        - iam_audit_logs_enabled
+      kics: [8173d5eb-96b5-4aa6-a71b-ecfa153c123d, 52ffcfa6-6c70-4ea6-8376-d828d3961669]
+    compliance:
+      cis_aws: ["4.1", "4.2", "4.5"]
+      cis_azure: ["6.1.1.1"]
+      cis_gcp: ["2.1"]
+      nist_800_53: [AU-2, AU-9, AU-12]
+
+  - id: rotate-and-scope-kms-keys
+    name: Rotate KMS keys and keep key policies narrow
+    how_to: >-
+      Set enable_key_rotation = true on symmetric aws_kms_key resources, and give
+      each key a policy that names the roles allowed to use it and, separately, the
+      roles allowed to administer it. Never allow kms:* or Principal "*" without a
+      condition such as kms:ViaService or aws:PrincipalOrgID. Keep
+      deletion_window_in_days at 30 and alert on ScheduleKeyDeletion. On GCP set
+      rotation_period on the crypto key; on Azure give Key Vault keys a
+      rotation_policy and an expiration date.
+    effort: low
+    providers: [aws, azure, gcp]
+    checks:
+      trivy: [AVD-AWS-0065, AVD-GCP-0065, AVD-AZU-0014]
+      checkov: [CKV_AWS_7, CKV_AWS_33, CKV_GCP_43, CKV_AZURE_40]
+      prowler: [kms_cmk_rotation_enabled, kms_key_not_publicly_accessible, kms_cmk_not_deleted_unintentionally, kms_key_rotation_max_90_days, keyvault_key_rotation_enabled]
+      kics: [7ebc9038-0bde-479a-acc4-6ed7b6758899, 0b530315-0ea4-497f-b34c-4ff86268f59d]
+    compliance:
+      cis_aws: ["4.6"]
+      cis_azure: ["8.3.9"]
+      cis_gcp: ["1.10", "1.11"]
+      nist_800_53: [SC-12]
+
+  - id: secure-terraform-state
+    name: Keep Terraform state in an encrypted, locked, private backend
+    how_to: >-
+      Use a remote backend, never local state or a state file in git: an S3 backend
+      with encrypt = true, a kms_key_id, and use_lockfile = true (or a DynamoDB lock
+      table), in a bucket with versioning, block public access, and a policy limited
+      to the CI role and a few admins. The GCS and azurerm backends and HCP
+      Terraform need the same controls. Add *.tfstate and secret *.tfvars files to
+      .gitignore, and remember sensitive = true hides values from output but not
+      from state.
+    effort: medium
+    providers: [any]
+    compliance:
+      nist_800_53: [SC-28, AC-3]
+
+  # ---- Container image -------------------------------------------------------
+  - id: non-root-minimal-images
+    name: Run containers as non-root on minimal images
+    how_to: >-
+      Create a user in the Dockerfile and end with USER set to a numeric UID, so
+      Kubernetes runAsNonRoot can verify it is not root (it rejects a user name it
+      cannot resolve). High-UID scanner checks also want a UID above 10000 so it
+      cannot match a user on the host. Use a slim, distroless, or scratch base and a
+      multi-stage build so compilers, package managers, and shells stay out of the
+      final image, and drop capabilities you do not need.
+    effort: low
+    asvs: [v5.0.0-15.2.3]
+    checks:
+      trivy: [AVD-DS-0002, AVD-KSV-0012, AVD-KSV-0020]
+      checkov: [CKV_DOCKER_3, CKV_DOCKER_8, CKV_K8S_23, CKV_K8S_40]
+      kics: [fd54f200-402c-4333-a5a4-36ef6709af2f, 67fd0c4a-68cf-46d7-8c41-bc9fba7e40ae]
+    compliance:
+      nist_800_53: [AC-6, CM-7]
+
+  - id: build-secrets-not-in-layers
+    name: Pass build secrets as BuildKit secret mounts
+    how_to: >-
+      Never COPY credential files or pass secrets through ARG or ENV, since both
+      end up in image layers or history. Use RUN --mount=type=secret (or
+      --mount=type=ssh) for private registries and repos, keep .env and key files out
+      with .dockerignore, and inject runtime secrets from the orchestrator or a
+      secrets manager. If a secret was ever baked in, rotate it; deleting it in a
+      later layer does not remove it.
+    effort: low
+    checks:
+      trivy: [AVD-DS-0031]
+    compliance:
+      nist_800_53: [IA-5(7)]
+
+  - id: pin-images-by-digest
+    name: Pin images by digest
+    how_to: >-
+      Reference base and deployed images as name:tag@sha256:<digest> instead of a
+      bare or latest tag, and let Renovate or Dependabot bump the digest through
+      reviewed pull requests. Pull only from registries you control or trust, and
+      in ECR turn on scan on push and image_tag_mutability = "IMMUTABLE".
+    effort: low
+    checks:
+      trivy: [AVD-DS-0001, AVD-KSV-0013, AVD-AWS-0031]
+      checkov: [CKV_DOCKER_7, CKV_K8S_43, CKV_K8S_14]
+      kics: [f45ea400-6bbe-4501-9fc7-1c3d75c32067, 9efb0b2d-89c9-41a3-91ca-dcc0aec911fd, 7c81d34c-8e5a-402b-9798-9f442630e678]
+    compliance:
+      nist_800_53: [SI-7]
+
+  # ---- Kubernetes ------------------------------------------------------------
+  - id: restrict-pod-security-context
+    name: Lock down the pod security context
+    how_to: >-
+      In every container set securityContext with privileged: false,
+      allowPrivilegeEscalation: false, readOnlyRootFilesystem: true (mount an
+      emptyDir where the app must write), runAsNonRoot: true, capabilities drop
+      ["ALL"], and seccompProfile type RuntimeDefault, and leave hostNetwork,
+      hostPID, hostIPC, and hostPath off. Enforce it per namespace with the label
+      pod-security.kubernetes.io/enforce=restricted.
+    effort: low
+    checks:
+      trivy: [AVD-KSV-0017, AVD-KSV-0001, AVD-KSV-0014, AVD-KSV-0003, AVD-KSV-0030, AVD-KSV-0009]
+      checkov: [CKV_K8S_16, CKV_K8S_20, CKV_K8S_22, CKV_K8S_37, CKV_K8S_31, CKV_K8S_19]
+      kics: [dd29336b-fe57-445b-a26e-e6aa867ae609, a9c2f49d-0671-4fc9-9ece-f4e261e128d0]
+    compliance:
+      nist_800_53: [AC-6, CM-7]
+
+  - id: set-pod-resource-limits
+    name: Set CPU and memory requests and limits
+    how_to: >-
+      Give every container resources.requests for CPU and memory and
+      resources.limits for memory (and CPU where noisy neighbours matter), and add a
+      LimitRange and a ResourceQuota per namespace so pods without them get
+      defaults and one workload cannot exhaust the node.
+    effort: low
+    checks:
+      trivy: [AVD-KSV-0011, AVD-KSV-0018, AVD-KSV-0015, AVD-KSV-0016]
+      checkov: [CKV_K8S_11, CKV_K8S_13, CKV_K8S_10, CKV_K8S_12]
+      kics: [4ac0e2b7-d2d2-4af7-8799-e8de6721ccda, b14d1bc4-a208-45db-92f0-e21f8e2588e9]
+    compliance:
+      nist_800_53: [SC-6]
+
+  - id: default-deny-network-policy
+    name: Start each namespace from a default-deny NetworkPolicy
+    how_to: >-
+      Add a NetworkPolicy with an empty podSelector that denies all ingress and
+      egress, then allow only the flows each app needs, including DNS to the
+      cluster DNS service. Make sure the network plugin enforces policies: turn on
+      network policy for GKE and AKS, or run Calico, Cilium, or the VPC CNI network
+      policy agent on EKS.
+    effort: medium
+    checks:
+      trivy: [AVD-GCP-0056, AVD-AZU-0043]
+      checkov: [CKV2_K8S_6]
+      kics: [0401f71b-9c1e-4821-ab15-a955caa621be, 85ab1c5b-014e-4352-b5f8-d7dea3bb4fd3]
+    compliance:
+      nist_800_53: [SC-7, AC-4]
+
+  - id: disable-sa-token-automount
+    name: Mount service account tokens only where the pod calls the API
+    how_to: >-
+      Set automountServiceAccountToken: false on each namespace's default
+      ServiceAccount and in pod specs. Give pods that do call the API their own
+      ServiceAccount bound to a namespaced Role, and never bind cluster-admin or
+      wildcard verbs and resources to a workload account.
+    effort: low
+    checks:
+      trivy: [AVD-KSV-0036, AVD-KSV-0044]
+      checkov: [CKV_K8S_38, CKV_K8S_41, CKV_K8S_49]
+      kics: [48471392-d4d0-47c0-b135-cdec95eb3eef]
+    compliance:
+      nist_800_53: [AC-6]
+
+  # ---- CI/CD pipeline --------------------------------------------------------
+  - id: pin-actions-to-sha
+    name: Pin third-party actions to a full commit SHA
+    how_to: >-
+      Reference every action and reusable workflow you do not own as
+      owner/repo@<40-character commit SHA> with the version in a comment, and let
+      Dependabot or Renovate update the SHAs through reviewed pull requests; whoever
+      controls an action's repo can move a tag or branch. In GitLab CI, pin
+      included templates to a commit and images to a digest.
+    effort: low
+    checks:
+      kics: [555ab8f9-2001-455e-a077-f2d0f41e2fb9]
+    compliance:
+      nist_800_53: [SI-7]
+
+  - id: least-privilege-workflow-permissions
+    name: Give the workflow token read-only permissions by default
+    how_to: >-
+      Put a top-level permissions: block with contents: read (or permissions: {})
+      in every workflow, and grant write scopes such as contents: write,
+      packages: write, or id-token: write only on the jobs that need them. Set the
+      repository's default workflow permissions to read-only as well.
+    effort: low
+    checks:
+      checkov: [CKV2_GHA_1]
+    compliance:
+      nist_800_53: [AC-6]
+
+  - id: no-pr-head-in-privileged-workflows
+    name: Never run untrusted pull request code with secrets
+    how_to: >-
+      Do not let pull_request_target or workflow_run workflows check out and build
+      the pull request head (github.event.pull_request.head.sha or head.ref); build
+      untrusted code under pull_request, which gets no secrets and a read-only
+      token, and hand results to a privileged workflow only as data. Never put
+      github.event values such as titles, branch names, or comments straight into
+      a run script; pass them through env and quote them.
+    effort: medium
+    checks:
+      checkov: [CKV_GHA_2]
+      kics: [20f14e1a-a899-4e79-9f09-b6a84cd4649b, 62ff6823-927a-427f-acf9-f1ea2932d616]
+    compliance:
+      nist_800_53: [SI-10, AC-6]
 
   # ---- Logging and errors ----------------------------------------------------
   - id: generic-error-messages
@@ -459,6 +1154,7 @@ countermeasures:
     effort: low
     asvs: [v5.0.0-16.2.5]
     baseline: true
+    providers: [any]
 
   - id: log-security-events
     name: Log security-relevant events

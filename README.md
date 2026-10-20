@@ -15,7 +15,7 @@ AI Security Crew covers both, in one Claude Code plugin.
 | Part | Protects | What it does |
 |------|----------|--------------|
 | **Threat review** | The code | Before coding, the agent gets the threats to guard against and the countermeasures to build in, from a library of components, threats and countermeasures |
-| **Dependency checks** | The code | When packages are added, confirms they exist and scans them for CVEs, then has the agent check whether the vulnerable code is actually reached |
+| **Dependency checks** | The code | When packages, GitHub Actions, or container images are added, confirms they exist and are pinned, scans them for CVEs with exploit context, and has the agent check whether the vulnerable code is actually reached |
 | **Code review checklist** | The code | After coding, the agent reviews its own code against a checklist for the parts it built. Your code is never sent to the tool |
 | **Runtime guard (asc-guard)** | The agent | Before each tool call, a decision model judges the call and the guard allows it, asks you, or denies it. Tool output is checked for injected instructions |
 
@@ -31,6 +31,18 @@ AI Security Crew covers both, in one Claude Code plugin.
 The first three parts are an MCP server plus skills: they give the agent knowledge and checklists, and the agent does the work. The guard is different: it runs as a client hook outside the model, so an agent that has been misled cannot skip it.
 
 ## Install
+
+### Requirements
+
+- Python 3.11 or newer
+- [uv](https://docs.astral.sh/uv/), which runs the server and the guard:
+
+  ```bash
+  curl -LsSf https://astral.sh/uv/install.sh | sh                                # macOS and Linux
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
+  ```
+
+- Outbound HTTPS to the public sources the tools read (OSV.dev, CISA KEV, FIRST EPSS, MITRE ATT&CK and CTID on GitHub, deps.dev, OpenSSF Scorecard, and the package and container registries you check). None of them need an API key.
 
 ### Claude Code plugin (recommended)
 
@@ -100,6 +112,46 @@ docker run --rm -p 8000:8000 mcp-security-review:latest --transport streamable-h
 
 The server sends its workflow to the connected agent when it starts, so there is nothing else to configure.
 
+### Download the threat catalogues
+
+The exploit and ATT&CK context comes from catalogues the server caches on disk. The plugin fetches them in the background when a Claude Code session starts. With any other setup, fetch them once after installing:
+
+```bash
+uvx --from git+https://github.com/Srajangpt1/ai-security-crew mcp-security-review fetch-intel
+```
+
+It prints one line per source (`kev`, `ctid`, `attack`) and always exits 0. The ATT&CK download is about 55 MB and takes a minute the first time; later runs skip anything still fresh (`--force` refetches). If you skip this step, the tools still work: they fetch on first use and return technique ids without names until the ATT&CK catalogue is ready.
+
+| Variable | Effect |
+|----------|--------|
+| `MCP_SECURITY_REVIEW_CACHE_DIR` | Where the cache lives. Defaults to `$XDG_CACHE_HOME/mcp-security-review`, else `~/.cache/mcp-security-review` |
+| `MCP_SECURITY_REVIEW_NO_PREFETCH=1` | Stops the plugin's session-start download |
+| `READ_ONLY_MODE=true` | Refuses tools that write files (`threatmodel_update_threat_model_file`) |
+| `ENABLED_TOOLS` | Comma-separated tool names to expose; all others are hidden and refused |
+
+### Update
+
+`uvx` caches the version it downloaded. To pick up a new release:
+
+```bash
+uvx --refresh --from git+https://github.com/Srajangpt1/ai-security-crew mcp-security-review --version
+```
+
+Plugin users run `/plugin marketplace update ai-security-crew`.
+
+### From source
+
+```bash
+git clone https://github.com/Srajangpt1/ai-security-crew
+cd ai-security-crew
+uv sync --frozen --dev
+uv run mcp-security-review fetch-intel
+uv run mcp-security-review            # stdio server
+uv run pytest                         # tests
+```
+
+To point an MCP client at the checkout, use `uv` with `--directory /path/to/ai-security-crew run mcp-security-review` as the command.
+
 ## Code security
 
 ### What your agent sees
@@ -125,35 +177,43 @@ For the task "Let users upload profile photos", the agent picks the `file-upload
 }
 ```
 
-The agent builds those countermeasures in, and after writing the code it reviews it against the checklist from `verify_code_security`.
+The agent builds those countermeasures in, and after writing the code it reviews it against the checklist from `general_verify_code_security`.
 
 ### Tools
 
 | Tool | When to use |
 |------|-------------|
-| `lightweight_security_review` | Before any coding task. Call once for a menu of components, then again with the ids that apply to get threats and countermeasures |
-| `perform_threat_model` | For significant new features. Starts a structured threat model from the library's threats for the same components |
-| `update_threat_model_file` | After `perform_threat_model`. Writes `threat-model.md` in the repo |
-| `verify_packages` | When adding packages. Confirms they exist with valid versions, which catches hallucinated names |
-| `scan_dependencies` | When adding packages. Scans for CVEs and asks the agent to check reachability in its own code |
-| `verify_code_security` | After generating code. Returns a checklist aimed at the components' threats. It never receives your code |
+| `general_project_context` | First, in a repo the agent does not know yet. Reads the project (read-only; `.env`, key, and state files are never opened) to detect its languages, frameworks, IaC, and CI, flags unpinned Actions and images, and suggests components |
+| `general_lightweight_security_review` | Before any coding task. Call once for a menu of components, then again with the ids that apply to get threats and countermeasures |
+| `threatmodel_perform_threat_model` | For significant new features. Starts a structured threat model from the library's threats for the same components |
+| `threatmodel_update_threat_model_file` | After `threatmodel_perform_threat_model`, once the user agrees. Writes `threat-model.md` in the repo. The only write tool; refused in read-only mode |
+| `threatmodel_attack_technique` | To explain a MITRE ATT&CK technique id from a review or scan, or to search techniques by keyword |
+| `sca_verify_packages` | When adding packages, GitHub Actions, or container images. Confirms they exist with valid versions, which catches hallucinated names, and flags Actions and images not pinned to a commit SHA or digest |
+| `sca_assess_packages` | Before adopting a brand-new library. License, provenance, OpenSSF Scorecard, and dependency-tree signal from deps.dev |
+| `sca_scan_dependencies` | When adding packages. Scans for CVEs, adds exploit context, and asks the agent to check reachability in its own code |
+| `sca_lookup_vulnerability` | To look up known CVE, GHSA, or OSV ids, with the same exploit context, without re-scanning |
+| `general_verify_code_security` | After generating code. Returns a checklist aimed at the components' threats. It never receives your code |
 
-Every failure comes back as `{"success": false, "error": {"code", "message", "hint"}}`.
+Every failure comes back as `{"success": false, "error": {"code", "message", "hint"}}`. Start the server with `--read-only` (or `READ_ONLY_MODE=true`) to refuse the write tool, and `ENABLED_TOOLS` to allow only the tools you list; both apply to calls by name, not just the tool list.
 
 ### Agent workflow
 
-1. **Before coding**: call `lightweight_security_review`. If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), the agent first fetches it with the matching MCP server you have connected.
-2. **When adding packages**: call `verify_packages`, then `scan_dependencies`.
-3. **After generating code**: call `verify_code_security` with the same components and review the code against the checklist.
-4. **For significant features**: call `perform_threat_model`, then `update_threat_model_file`.
+1. **Before coding**: in a new repo, call `general_project_context`. Then call `general_lightweight_security_review`. If the task comes from a ticket or page link (Jira, Confluence, Linear, GitHub issues, and so on), the agent first fetches it with the matching MCP server you have connected.
+2. **When adding packages**: call `sca_verify_packages` (also for Actions and images), `sca_assess_packages` for a new library, then `sca_scan_dependencies`. Anything in `upgrade_now` is upgraded regardless of reachability.
+3. **After generating code**: call `general_verify_code_security` with the same components and review the code against the checklist.
+4. **For significant features**: call `threatmodel_perform_threat_model`, then `threatmodel_update_threat_model_file`.
 
 ### Dependency scanning
 
-`scan_dependencies` uses [OSV.dev](https://osv.dev) to find CVEs. No code is sent to the tool. Each finding carries a `reachability_check`: the affected symbols OSV lists (or `no_symbol_data`), the fixed version, and a question. Your agent answers it by reading its own code, and upgrades when the symbols are used or it cannot tell.
+`sca_scan_dependencies` uses [OSV.dev](https://osv.dev) to find CVEs. No code is sent to the tool. Each finding carries a `reachability_check`: the affected symbols OSV lists (or `no_symbol_data`), the fixed version, and a question. Your agent answers it by reading its own code, and upgrades when the symbols are used or it cannot tell.
+
+Each finding also carries an `exploit_context`: whether the CVE is in the [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) catalog, its [FIRST EPSS](https://www.first.org/epss/) score, and the MITRE ATT&CK techniques the CTID mappings link to it. Findings that are known exploited or likely to be are listed in `upgrade_now`, and the agent upgrades those without waiting on reachability. A source that cannot be reached is reported as unavailable; the scan still returns.
+
+All of these are public sources that need no API key. The server caches them on disk (`MCP_SECURITY_REVIEW_CACHE_DIR` to move the cache). `mcp-security-review fetch-intel` refreshes the cache, and the plugin runs it in the background when a Claude Code session starts; set `MCP_SECURITY_REVIEW_NO_PREFETCH=1` to turn that off.
 
 ### Threat library
 
-`lightweight_security_review` is backed by a built-in library of **25 components**, **88 threats**, and **85 countermeasures** (web and API apps, plus LLM, agent, and MCP features). Threats carry STRIDE and CWE references (and OWASP MCP Top 10 ids for agent and MCP threats), and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids.
+`general_lightweight_security_review` is backed by a built-in library of **33 components**, **114 threats**, and **115 countermeasures** (web and API apps, cloud infrastructure as Terraform, container images, Kubernetes, and CI pipelines, plus LLM, agent, and MCP features). Threats carry STRIDE, CWE, and MITRE ATT&CK references (and OWASP MCP Top 10 ids for agent and MCP threats), and countermeasures cite [OWASP ASVS 5.0.0](https://github.com/OWASP/ASVS) requirement ids. Infrastructure countermeasures also name the Trivy, Checkov, Prowler, and KICS checks that test for them, with CIS benchmark and NIST 800-53 ids, so `general_verify_code_security` returns an infrastructure checklist for them instead of the app-code one.
 
 Add your own components, threats, and countermeasures in `.ai-security-crew/library/*.yaml` in your repo:
 
