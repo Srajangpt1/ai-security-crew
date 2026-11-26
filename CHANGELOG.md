@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added — security agents and Cursor plugin
+- Four read-only subagents in `agents/`, shipped with the plugin: `security-reviewer`, `finding-verifier`, `dependency-auditor` and `threat-modeler`. They use the MCP tools, fall back to plain guidance without them, and block file edits (`disallowedTools` in Claude Code, `readonly` in Cursor).
+- Cursor plugin manifest (`.cursor-plugin/plugin.json`) and marketplace file. It ships the MCP server, skills and agents. The guard hooks stay Claude Code only.
+
 ### Changed — plugin packaging
 - The Claude Code plugin now registers the MCP server (`sec-review`), so one install gives the tools, the skills and the guard hooks.
 - The guard hooks check for `TYPESAFE_API_KEY` (or `ASC_GUARD_ENABLE`) before starting `uvx`. Without a key they exit at once instead of adding about a second to every tool call. `asc-guard install` writes the same check.

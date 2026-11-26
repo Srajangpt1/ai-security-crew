@@ -1,0 +1,16 @@
+{
+  "name": "ai-security-crew",
+  "owner": {
+    "name": "Srajan Gupta"
+  },
+  "metadata": {
+    "description": "Security tools for AI coding agents"
+  },
+  "plugins": [
+    {
+      "name": "mcp-security-review",
+      "source": "./",
+      "description": "Threat review, dependency checks, code review checklists, threat models, and security review agents"
+    }
+  ]
+}

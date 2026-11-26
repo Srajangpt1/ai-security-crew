@@ -1,0 +1,31 @@
+{
+  "name": "mcp-security-review",
+  "description": "Security for AI coding: pre-coding threat review, dependency checks, code review checklists, threat models, and security review agents.",
+  "author": {
+    "name": "Srajan Gupta"
+  },
+  "homepage": "https://github.com/Srajangpt1/ai-security-crew",
+  "repository": "https://github.com/Srajangpt1/ai-security-crew",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "threat-model",
+    "code-review",
+    "sca",
+    "mcp"
+  ],
+  "hooks": {
+    "version": 1,
+    "hooks": {}
+  },
+  "mcpServers": {
+    "sec-review": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/Srajangpt1/ai-security-crew",
+        "mcp-security-review"
+      ]
+    }
+  }
+}
