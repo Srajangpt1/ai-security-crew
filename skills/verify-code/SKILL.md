@@ -51,4 +51,4 @@ Build the checklist yourself: list the components the code implements, the threa
 <findings with reachability verdicts, or "no new packages">
 ```
 
-Order findings by severity. Offer to apply the fixes.
+Order findings by severity. Offer to apply the fixes. If the `finding-verifier` agent is available, offer to run it on high and critical findings first.

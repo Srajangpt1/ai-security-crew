@@ -75,6 +75,7 @@ skills-workspace/
 
 # cursor
 .cursor*
+!.cursor-plugin/
 
 # Claude (ignore personal settings, track shared commands/skills)
 .claude/settings.local.json

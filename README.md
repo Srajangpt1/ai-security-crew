@@ -46,6 +46,11 @@ This installs everything. The MCP server and the guard run through [uv](https://
 | MCP server (`sec-review`) | The tools listed under [Code security](#code-security). Starts from GitHub through `uvx` |
 | Skills | `/security-review` before coding, `/verify-code` after coding, `/threat-model` for new features. They use the MCP tools and fall back to plain guidance without them |
 | Guard hooks | Off until you set `TYPESAFE_API_KEY`. Without the key they exit at once and add no delay. See [Agent security](#agent-security-asc-guard) |
+| Agents | Four read-only subagents for focused security work. See [Security agents](#security-agents) |
+
+### Cursor plugin
+
+The same repo is also a Cursor plugin (`.cursor-plugin/plugin.json`). It ships the MCP server, the skills and the agents; the guard hooks are Claude Code only for now. To try it locally, copy the repo to `~/.cursor/plugins/local/mcp-security-review/` and reload the window. Teams can add the repo under **Dashboard → Plugins & MCPs → Add Marketplace → Import from Repo**.
 
 ### MCP server only (any MCP client)
 
@@ -171,6 +176,19 @@ threats:
 ```
 
 See [docs/ADDING_THREATS.md](docs/ADDING_THREATS.md) for the full format.
+
+### Security agents
+
+The plugin ships four subagents. Each runs in its own context, uses the MCP tools above, and is read-only: it reports and recommends, and never edits your code.
+
+| Agent | Use it for |
+|-------|-----------|
+| `security-reviewer` | Reviewing changed code against the checklist for the parts it implements |
+| `finding-verifier` | Trying to disprove each finding before you act on it. It did not find them, so it checks them fresh |
+| `dependency-auditor` | Checking new packages exist, scanning them for CVEs, and checking reachability |
+| `threat-modeler` | Building a threat model for a new feature |
+
+The main agent picks them by their description, or you can ask for one by name (in Claude Code, `@agent-mcp-security-review:security-reviewer`). A good pattern after coding: `security-reviewer`, then `finding-verifier` on anything high or critical.
 
 ## Agent security (asc-guard)
 
